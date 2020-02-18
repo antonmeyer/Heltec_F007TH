@@ -1,24 +1,23 @@
 #include <Arduino.h>
 #include <U8x8lib.h>
-//ToDo clean that lib and object oriented conecpt 
+//ToDo clean that lib and object oriented conecpt
 
 U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/15, /* data=*/4, /* reset=*/16);
 
 // Variables for Manchester Receiver Logic:
-word sDelay = 242;         // Small Delay about 1/4 of bit duration
-word lDelay = 484;         // Long Delay about 1/2 of bit duration, 1/4 + 1/2 = 3/4
+word sDelay = 250;         // Small Delay about 1/4 of bit duration
+word lDelay = 500;         // Long Delay about 1/2 of bit duration, 1/4 + 1/2 = 3/4
 byte polarity = 1;         // 0 for lo->hi==1 or 1 for hi->lo==1 for Polarity, sets tempBit at start
 byte tempBit = 1;          // Reflects the required transition polarity
 boolean firstZero = false; // flags when the first '0' is found.
 // Variables for Header detection
-byte headerBits = 10; // The number of ones expected to make a valid header
+byte headerBits = 11; // The number of ones expected to make a valid header
 byte headerHits = 0;  // Counts the number of "1"s to determine a header
 // Variables for Byte storage
-boolean sync0In = true; // Expecting sync0 to be inside byte boundaries, set to false for sync0 outside bytes
-byte dataByte = 0;      // Accumulates the bit information
-byte nosBits = 6;       // Counts to 8 bits within a dataByte
-byte maxBytes = 6;      // Set the bytes collected after each header. NB if set too high, any end noise will cause an error
-byte nosBytes = 0;      // Counter stays within 0 -> maxBytes
+byte dataByte = 0; // Accumulates the bit information
+byte nosBits = 6;  // Counts to 8 bits within a dataByte
+byte maxBytes = 6; // Set the bytes collected after each header. NB if set too high, any end noise will cause an error
+byte nosBytes = 0; // Counter stays within 0 -> maxBytes
 // Variables for multiple packets
 byte bank = 0;       // Points to the array of 0 to 3 banks of results from up to 4 last data downloads
 byte nosRepeats = 3; // Number of times the header/data is fetched at least once or up to 4 times
@@ -50,152 +49,143 @@ unsigned long Dstop = 0;
 
 byte rxstate = 0;
 
-
 // Interrupt Service Routine for a falling edge
-void RF_ISR()
+void IRAM_ATTR RF_ISR()
 {
-    if (!isrcalled)
-    {
-        EdgeTime = micros();
-        isrcalled = true;
-    }
+  if (!isrcalled)
+  {
+    EdgeTime = micros();
+    isrcalled = true;
+  }
 } // end of isr
 
-char * temp2str (byte idx) {
-    //helper function to convert temp into °C and string
+char *temp2str(byte idx)
+{
+  //helper function to convert temp into °C and string
 
-    siTemp = 0.0556 * (chTemp[idx] - 720);
-    dtostrf(siTemp,2,1,tempstr[idx]);
-    return tempstr[idx];
+  siTemp = 0.0556 * (chTemp[idx] - 720);
+  dtostrf(siTemp, 2, 1, tempstr[idx]);
+  return tempstr[idx];
 }
 
 void saveReading(int stnId, int newTemp, int newHum)
 {
 
-    bool sendData = false;
-    if (stnId >= 0 && stnId <= 7)
-    {
-
-        // If the raw temperature is 720 (default when sketch started so first reading), accept the new readings as the temperature and humidity on channel 1
-        if (chTemp[stnId] == 720)
-        {
-            chTemp[stnId] = newTemp;
-            chHum[stnId] = newHum;
-            sendData = true;
-        }
-        // If the raw temperature is other than 720 (so a subsequent reading), check that it is close to the previous reading before accepting as the new channel 1 reading
-        else
-        {
-            differencetemp = newTemp - chTemp[stnId];
-            differencehum = newHum - chHum[stnId];
-            if ((differencetemp < 20 && differencetemp > -20) && (differencehum < 5 && differencehum > -5))
-            {
-                chTemp[stnId] = newTemp;
-                chHum[stnId] = newHum;
-                sendData = true;
-            }
-        }
-
-        unsigned long now = millis();
-        if (sendData && (chLastRecv[stnId] > now || (now - chLastRecv[stnId]) > 1000))
-        {
-            // checks above seems to avoid too many outpuut
-            //digitalWrite(7,HIGH); //is for Oszi trigger
-            //delay(1);
-            int stnId1 = stnId + 1;
-            Serial.print(stnId1);
-            Serial.print(":");
-        
-            Serial.print(temp2str(stnId));
-            Serial.print(":");
-            Serial.println(newHum);
-            chLastRecv[stnId] = now;
-
-            u8x8.clearLine(stnId1);
-            u8x8.drawGlyph(0, stnId1, ('1' + stnId));
-            u8x8.drawUTF8(1, stnId1, ": ");
-            char tempstr[6]; //float does not work in Arduino sprintf
-            dtostrf(siTemp, 2, 1, tempstr);
-            snprintf(displaystr, 15, "%s ", tempstr);
-            u8x8.drawUTF8(3, stnId1, displaystr);
-            snprintf(displaystr, 15, "%d  ", newHum);
-            u8x8.drawUTF8(8, stnId1, displaystr);
-        }
+  if (stnId >= 0 && stnId <= 7)
+  {
+    /* //ToDo correct some error readings - the strange thing ..error readings comes in bursts
+    if (chHum[stnId] == 0) {
+       chTemp[stnId] = newTemp;
+       chHum[stnId] = newHum;
     }
+    else {
+    chTemp[stnId] = (chTemp[stnId] + newTemp) >> 1;
+    chHum[stnId] = (chHum[stnId] + newHum) >> 1;
+    } */
+
+    chTemp[stnId] = newTemp;
+    chHum[stnId] = newHum;
+
+    unsigned long now = millis();
+    if ((chLastRecv[stnId] > now || (now - chLastRecv[stnId]) > 1000))
+    //this checks are strange
+    {
+      // checks above seems to avoid too many outpuut
+      //digitalWrite(7,HIGH); //is for Oszi trigger
+      //delay(1);
+      chLastRecv[stnId] = now;
+
+      int stnId1 = stnId + 1;
+      Serial.print(stnId1);
+      Serial.print(":");
+
+      Serial.print(temp2str(stnId));
+      Serial.print(":");
+      Serial.println(newHum);
+
+      u8x8.clearLine(stnId1);
+      u8x8.drawGlyph(0, stnId1, ('1' + stnId));
+      u8x8.drawUTF8(1, stnId1, ": ");
+      char tempstr[6]; //float does not work in Arduino sprintf
+      dtostrf(siTemp, 2, 1, tempstr);
+      snprintf(displaystr, 15, "%s ", tempstr);
+      u8x8.drawUTF8(3, stnId1, displaystr);
+      snprintf(displaystr, 15, "%d  ", newHum);
+      u8x8.drawUTF8(8, stnId1, displaystr);
+    }
+  }
 }
 
 void add(byte bitData)
 {
-    dataByte = (dataByte << 1) | bitData;
-    nosBits++;
-    if (nosBits == 8)
+  dataByte = (dataByte << 1) | bitData;
+  nosBits++;
+  if (nosBits == 8)
+  {
+    nosBits = 0;
+    manchester[nosBytes] = dataByte;
+    nosBytes++;
+  }
+  if (nosBytes == maxBytes)
+  {
+    rxstate = 0; // we got all bytes lets start for the next packet
+    // Subroutines to extract data from Manchester encoding and error checking
+
+    // Identify channels 0 to 7 by looking at 3 bits in byte 3
+    int stnId = (manchester[3] & B01110000) / 16;
+
+    // Identify sensor by looking for sensorID in byte 1 (F007th Ambient Thermo-Hygrometer = 0x45)
+    dataType = manchester[1];
+
+    for (int j = 0; j < 6; j++)
     {
-        nosBits = 0;
-        manchester[nosBytes] = dataByte;
-        nosBytes++;
+      Serial.print(manchester[j], HEX);
     }
-    if (nosBytes == maxBytes)
+    Serial.println();
+
+    // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
+    Newtemp = float((manchester[3] & B00000111) * 256) + manchester[4];
+
+    // Gets humidity data from byte 5
+    Newhum = manchester[5];
+
+    // Checks sensor is a F007th with a valid humidity reading equal or less than 100
+    if (dataType == 0x45 && Newhum <= 100)
     {
-        rxstate = 0; // we got all bytes lets start for the next packet
-        // Subroutines to extract data from Manchester encoding and error checking
-
-        // Identify channels 0 to 7 by looking at 3 bits in byte 3
-        int stnId = (manchester[3] & B01110000) / 16;
-
-        // Identify sensor by looking for sensorID in byte 1 (F007th Ambient Thermo-Hygrometer = 0x45)
-        dataType = manchester[1];
-        
-        /*for (int j = 0; j < 6; j++)
-        {
-            Serial.print(manchester[j], HEX);
-        }
-        Serial.println();
-        */
-
-        // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
-        Newtemp = float((manchester[3] & B00000111) * 256) + manchester[4];
-
-        // Gets humidity data from byte 5
-        Newhum = manchester[5];
-
-        // Checks sensor is a F007th with a valid humidity reading equal or less than 100
-        if (dataType == 0x45 && Newhum <= 100)
-        {
-            saveReading(stnId, Newtemp, Newhum);
-        }
+      saveReading(stnId, Newtemp, Newhum);
     }
+  }
 }
 
 void eraseManchester()
 {
-    for (int j = 0; j < 4; j++)
-    {
-        manchester[j] = j;
-    }
+  for (int j = 0; j < 4; j++)
+  {
+    manchester[j] = j;
+  }
 }
-
 
 void RFinit(byte rxpin)
 {
 
-  //ToDo wrong place 
+  //ToDo wrong place
   u8x8.begin();
   u8x8.setFont(u8x8_font_chroma48medium8_r);
   u8x8.drawString(0, 0, "Heltec F0007TH");
 
+  pinMode(rxpin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
 
-    pinMode(rxpin, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
-
-    eraseManchester(); // clear the array to different nos cause if all zeroes it might think that is a valid 3 packets ie all equal
-    chTemp[0] = chTemp[1] = chTemp[2] = chTemp[3] = chTemp[4] = chTemp[5] = chTemp[6] = chTemp[7] = 720;
-    chHum[0] = chHum[1] = chHum[2] = chHum[3] = chHum[4] = chHum[5] = chHum[6] = chHum[7] = 0;
-    chLastRecv[0] = chLastRecv[1] = chLastRecv[2] = chLastRecv[3] = chLastRecv[4] = chLastRecv[5] = chLastRecv[6] = chLastRecv[7] = 0;
+  eraseManchester(); // clear the array to different nos cause if all zeroes it might think that is a valid 3 packets ie all equal
+  chTemp[0] = chTemp[1] = chTemp[2] = chTemp[3] = chTemp[4] = chTemp[5] = chTemp[6] = chTemp[7] = 720;
+  chHum[0] = chHum[1] = chHum[2] = chHum[3] = chHum[4] = chHum[5] = chHum[6] = chHum[7] = 0;
+  chLastRecv[0] = chLastRecv[1] = chLastRecv[2] = chLastRecv[3] = chLastRecv[4] = chLastRecv[5] = chLastRecv[6] = chLastRecv[7] = 0;
 }
 
-void check_RF_state(byte rxpin) {
+void check_RF_state(byte rxpin)
+{
 
-    //ToDo init values depends on the state: new packet
+  //ToDo init values depends on the state: new packet
   //state 0 = init = new packet
   //state 1 = wait for first change
   //state 2 = sDelay
@@ -215,10 +205,12 @@ void check_RF_state(byte rxpin) {
     nosBytes = 0;
     rxstate++; //next state
     isrcalled = false;
+    attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
     //break;
   case 1: //waiting for edge
     if ((digitalRead(rxpin) == tempBit))
     {
+      detachInterrupt(digitalPinToInterrupt(rxpin));
       Dstop = EdgeTime + sDelay;
       //isrcalled = false; //double check this state handling race condition, noise, does it fit for the timing in all cases?
       rxstate = 2;
@@ -253,6 +245,7 @@ void check_RF_state(byte rxpin) {
     else
       break; //we have to wait in state 3
   case 4:
+    isrcalled = false;
     if (digitalRead(rxpin) == tempBit)
     { // if RxPin has not swapped, then bitWaveform is swapping
       // If the header is done, then it means data change is occuring ie 1->0, or 0->1
@@ -293,6 +286,6 @@ void check_RF_state(byte rxpin) {
     }                  // end of dealing with zero's (in header, first or later zeroes)
     rxstate = 1;       //next bit
     isrcalled = false; //double check this state handling race condition, noise, does it fit for the timing in all cases?
-  }                    // case statement
-
+    attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
+  } // case statement we might disable interrupt, as it is ignored anyhow
 }

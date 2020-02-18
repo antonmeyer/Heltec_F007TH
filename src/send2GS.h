@@ -4,10 +4,11 @@
 
 WiFiClientSecure wClient;
 
-const char* server = "script.google.com";  // Server URL
+const char *server = "script.google.com"; // Server URL
 
-void WiFiinit() {
-    Serial.println("Warte auf Verbindung");
+void WiFiinit()
+{
+  Serial.println("Warte auf Verbindung");
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -24,37 +25,42 @@ boolean send2GS(String datastr)
   String movedURL;
   String line;
 
-  if (debug)Serial.println("Verbinde zum script.google.com");
+  if (debug)
+    Serial.println("Verbinde zum script.google.com");
   if (!wClient.connect(server, 443))
   {
-    if (debug) Serial.println("Verbindung fehlgeschlagen!");
+    if (debug)
+      Serial.println("Verbindung fehlgeschlagen!");
     return false;
   }
 
-  if (debug) Serial.println("Verbunden!");
+  if (debug)
+    Serial.println("Verbunden!");
   // ESP32 Erzeugt HTTPS Anfrage an Google sheets
   String url = "https://" + String(server) + "/macros/s/" + key + "/exec?" + datastr;
-  if (debug) Serial.println(url);
+  if (debug)
+    Serial.println(url);
   wClient.println("GET " + url);
-  wClient.println("Host: script.google.com" );
+  wClient.println("Host: script.google.com");
   wClient.println("Connection: close");
   wClient.println();
 
-
   // ESP32 empfängt antwort vom Google sheets
-  while (wClient.connected())     // ESP32  empfängt Header
+  while (wClient.connected()) // ESP32  empfängt Header
   {
     line = wClient.readStringUntil('\n');
-    if (debug) Serial.println(line);
-    if (line == "\r") break;      // Ende Des Headers empfangen
-    if (line.indexOf ( "Location" ) >= 0)   // Weiterleitung im Header?
-    { // Neue URL merken
-      movedURL = line.substring ( line.indexOf ( ":" ) + 2 ) ;
+    if (debug)
+      Serial.println(line);
+    if (line == "\r")
+      break;                           // Ende Des Headers empfangen
+    if (line.indexOf("Location") >= 0) // Weiterleitung im Header?
+    {                                  // Neue URL merken
+      movedURL = line.substring(line.indexOf(":") + 2);
     }
   }
-wClient.stop();
-return true;
-  /*
+  wClient.stop();
+  return true;
+  /* ToDo  move and error handling should be improved
   while (wClient.connected())    // Google Antwort HTML Zeilenweise Lesen
   {
     if (wClient.available())
@@ -107,5 +113,4 @@ return true;
   } else return false;
 
   */
-
 }
