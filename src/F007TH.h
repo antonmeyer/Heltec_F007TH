@@ -1,12 +1,13 @@
 #include <Arduino.h>
 #include <U8x8lib.h>
+#include "crc.h"
 //ToDo clean that lib and object oriented conecpt
 
 U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/15, /* data=*/4, /* reset=*/16);
 
 // Variables for Manchester Receiver Logic:
-word sDelay = 250;         // Small Delay about 1/4 of bit duration
-word lDelay = 500;         // Long Delay about 1/2 of bit duration, 1/4 + 1/2 = 3/4
+word sDelay = 242;         // Small Delay about 1/4 of bit duration
+word lDelay = 484;         // Long Delay about 1/2 of bit duration, 1/4 + 1/2 = 3/4
 byte polarity = 1;         // 0 for lo->hi==1 or 1 for hi->lo==1 for Polarity, sets tempBit at start
 byte tempBit = 1;          // Reflects the required transition polarity
 boolean firstZero = false; // flags when the first '0' is found.
@@ -16,20 +17,16 @@ byte headerHits = 0;  // Counts the number of "1"s to determine a header
 // Variables for Byte storage
 byte dataByte = 0; // Accumulates the bit information
 byte nosBits = 6;  // Counts to 8 bits within a dataByte
-byte maxBytes = 6; // Set the bytes collected after each header. NB if set too high, any end noise will cause an error
+#define maxBytes 7 // Set the bytes collected after each header. NB if set too high, any end noise will cause an error
 byte nosBytes = 0; // Counter stays within 0 -> maxBytes
 // Variables for multiple packets
-byte bank = 0;       // Points to the array of 0 to 3 banks of results from up to 4 last data downloads
-byte nosRepeats = 3; // Number of times the header/data is fetched at least once or up to 4 times
-// Banks for multiple packets if required (at least one will be needed)
+
 byte manchester[7]; // Array to store 7 bytes of manchester pattern decoded on the fly
 
 // Variables to prepare recorded values for Ambient
 
 byte stnId = 0;   // Identifies the channel number
-int dataType = 0; // Identifies the Ambient Thermo-Hygrometer code
-int differencetemp = 0;
-int differencehum = 0;
+
 int Newtemp = 0;
 int Newhum = 0;
 int chTemp[8];
@@ -41,10 +38,8 @@ float siTemp;
 
 char tempstr[8][6];
 
-volatile boolean isrcalled;
 volatile unsigned long EdgeTime; // zur Speicherung der Zeit
-unsigned long LastEdgeTime = 0;
-unsigned long DiffEdgeTime = 0;
+
 unsigned long Dstop = 0;
 
 byte rxstate = 0;
@@ -52,11 +47,7 @@ byte rxstate = 0;
 // Interrupt Service Routine for a falling edge
 void IRAM_ATTR RF_ISR()
 {
-  if (!isrcalled)
-  {
-    EdgeTime = micros();
-    isrcalled = true;
-  }
+  EdgeTime = micros();
 } // end of isr
 
 char *temp2str(byte idx)
@@ -73,16 +64,6 @@ void saveReading(int stnId, int newTemp, int newHum)
 
   if (stnId >= 0 && stnId <= 7)
   {
-    /* //ToDo correct some error readings - the strange thing ..error readings comes in bursts
-    if (chHum[stnId] == 0) {
-       chTemp[stnId] = newTemp;
-       chHum[stnId] = newHum;
-    }
-    else {
-    chTemp[stnId] = (chTemp[stnId] + newTemp) >> 1;
-    chHum[stnId] = (chHum[stnId] + newHum) >> 1;
-    } */
-
     chTemp[stnId] = newTemp;
     chHum[stnId] = newHum;
 
@@ -132,26 +113,29 @@ void add(byte bitData)
     // Subroutines to extract data from Manchester encoding and error checking
 
     // Identify channels 0 to 7 by looking at 3 bits in byte 3
-    int stnId = (manchester[3] & B01110000) / 16;
 
     // Identify sensor by looking for sensorID in byte 1 (F007th Ambient Thermo-Hygrometer = 0x45)
-    dataType = manchester[1];
 
-    for (int j = 0; j < 6; j++)
+    /*
+    for (byte j = 1; j < maxBytes; j++)
     {
       Serial.print(manchester[j], HEX);
     }
-    Serial.println();
-
-    // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
-    Newtemp = float((manchester[3] & B00000111) * 256) + manchester[4];
-
+    Serial.print(":");
+    Serial.println(Checksum(5, &manchester[1]),HEX);
+    //Serial.println((lfsr_digest8(&manchester[1], 5, 0x98, 0x3e) ^ 0x64), HEX);
+   //Serial.println();
+*/
     // Gets humidity data from byte 5
-    Newhum = manchester[5];
 
     // Checks sensor is a F007th with a valid humidity reading equal or less than 100
-    if (dataType == 0x45 && Newhum <= 100)
+    if (manchester[1] == 0x45 && (Checksum(5, &manchester[1]) == manchester[6]))
     {
+      // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
+      int stnId = (manchester[3] & B01110000) >> 4;
+      Newtemp = ((manchester[3] & B00000111) << 8) + manchester[4];
+      Newhum = manchester[5];
+
       saveReading(stnId, Newtemp, Newhum);
     }
   }
@@ -159,7 +143,7 @@ void add(byte bitData)
 
 void eraseManchester()
 {
-  for (int j = 0; j < 4; j++)
+  for (byte j = 0; j < maxBytes; j++)
   {
     manchester[j] = j;
   }
@@ -204,11 +188,11 @@ void check_RF_state(byte rxpin)
     nosBits = 6;
     nosBytes = 0;
     rxstate++; //next state
-    isrcalled = false;
+    EdgeTime = 0;
     attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
     //break;
   case 1: //waiting for edge
-    if ((digitalRead(rxpin) == tempBit))
+    if ((digitalRead(rxpin) == tempBit) && EdgeTime > 0)
     {
       detachInterrupt(digitalPinToInterrupt(rxpin));
       Dstop = EdgeTime + sDelay;
@@ -245,7 +229,6 @@ void check_RF_state(byte rxpin)
     else
       break; //we have to wait in state 3
   case 4:
-    isrcalled = false;
     if (digitalRead(rxpin) == tempBit)
     { // if RxPin has not swapped, then bitWaveform is swapping
       // If the header is done, then it means data change is occuring ie 1->0, or 0->1
@@ -285,7 +268,7 @@ void check_RF_state(byte rxpin)
       }                // end of dealing with a first zero
     }                  // end of dealing with zero's (in header, first or later zeroes)
     rxstate = 1;       //next bit
-    isrcalled = false; //double check this state handling race condition, noise, does it fit for the timing in all cases?
+    EdgeTime = 0; //double check this state handling race condition, noise, does it fit for the timing in all cases?
     attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
   } // case statement we might disable interrupt, as it is ignored anyhow
 }
