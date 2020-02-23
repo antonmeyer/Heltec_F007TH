@@ -1,9 +1,10 @@
 #include <Arduino.h>
-#include <U8x8lib.h>
+//#include <U8x8lib.h>
+#include <heltec.h>
 #include "crc.h"
 //ToDo clean that lib and object oriented conecpt
 
-U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/15, /* data=*/4, /* reset=*/16);
+//U8X8_SSD1306_128X64_NONAME_SW_I2C OLED(/* clock=*/15, /* data=*/4, /* reset=*/16);
 
 // Variables for Manchester Receiver Logic:
 word sDelay = 242;         // Small Delay about 1/4 of bit duration
@@ -25,7 +26,7 @@ byte manchester[7]; // Array to store 7 bytes of manchester pattern decoded on t
 
 // Variables to prepare recorded values for Ambient
 
-byte stnId = 0;   // Identifies the channel number
+byte stnId = 0; // Identifies the channel number
 
 int Newtemp = 0;
 int Newhum = 0;
@@ -83,16 +84,15 @@ void saveReading(int stnId, int newTemp, int newHum)
       Serial.print(temp2str(stnId));
       Serial.print(":");
       Serial.println(newHum);
-
-      u8x8.clearLine(stnId1);
-      u8x8.drawGlyph(0, stnId1, ('1' + stnId));
-      u8x8.drawUTF8(1, stnId1, ": ");
+      /*
+      //u8x8.clearLine(stnId1);
+      OLED.drawGlyph(0, stnId1, ('1' + stnId));
+      OLED.drawUTF8(1, stnId1, ": ");
       char tempstr[6]; //float does not work in Arduino sprintf
       dtostrf(siTemp, 2, 1, tempstr);
-      snprintf(displaystr, 15, "%s ", tempstr);
-      u8x8.drawUTF8(3, stnId1, displaystr);
-      snprintf(displaystr, 15, "%d  ", newHum);
-      u8x8.drawUTF8(8, stnId1, displaystr);
+      snprintf(displaystr, 15, "%s°C %d%%", tempstr, newHum);
+      OLED.drawUTF8(3, stnId1, displaystr);
+*/
     }
   }
 }
@@ -153,19 +153,19 @@ void RFinit(byte rxpin)
 {
 
   //ToDo wrong place
-  u8x8.begin();
-  u8x8.setFont(u8x8_font_chroma48medium8_r);
-  u8x8.drawString(0, 0, "Heltec F0007TH");
-
-  pinMode(rxpin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
+  /*OLED.begin();
+  OLED.setFont(u8x8_font_chroma48medium8_r);
+  OLED.drawString(0, 0, "Heltec F0007TH");
+  */
 
   eraseManchester(); // clear the array to different nos cause if all zeroes it might think that is a valid 3 packets ie all equal
   chTemp[0] = chTemp[1] = chTemp[2] = chTemp[3] = chTemp[4] = chTemp[5] = chTemp[6] = chTemp[7] = 720;
   chHum[0] = chHum[1] = chHum[2] = chHum[3] = chHum[4] = chHum[5] = chHum[6] = chHum[7] = 0;
   chLastRecv[0] = chLastRecv[1] = chLastRecv[2] = chLastRecv[3] = chLastRecv[4] = chLastRecv[5] = chLastRecv[6] = chLastRecv[7] = 0;
-}
 
+  pinMode(rxpin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
+}
 void check_RF_state(byte rxpin)
 {
 
@@ -185,7 +185,7 @@ void check_RF_state(byte rxpin)
     tempBit = polarity; // these begin the same for a packet
     firstZero = false;
     headerHits = 0;
-    nosBits = 6;
+    nosBits = 6; // starts with 2 Bits???
     nosBytes = 0;
     rxstate++; //next state
     EdgeTime = 0;
@@ -265,9 +265,9 @@ void check_RF_state(byte rxpin)
       {
         firstZero = true;
         add(bitState);
-      }                // end of dealing with a first zero
-    }                  // end of dealing with zero's (in header, first or later zeroes)
-    rxstate = 1;       //next bit
+      }           // end of dealing with a first zero
+    }             // end of dealing with zero's (in header, first or later zeroes)
+    rxstate = 1;  //next bit
     EdgeTime = 0; //double check this state handling race condition, noise, does it fit for the timing in all cases?
     attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
   } // case statement we might disable interrupt, as it is ignored anyhow

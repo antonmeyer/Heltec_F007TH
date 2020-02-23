@@ -1,4 +1,5 @@
-#include <WiFiClientSecure.h>
+//#include <WiFiMulti.h>
+#include <HTTPClient.h>
 #include "credentials.h"
 #define debug true
 
@@ -20,97 +21,37 @@ void WiFiinit()
   Serial.println(WiFi.localIP());
 }
 
-boolean send2GS(String datastr)
+void send2google(String datastr)
 {
-  String movedURL;
-  String line;
 
-  if (debug)
-    Serial.println("Verbinde zum script.google.com");
-  if (!wClient.connect(server, 443))
-  {
-    if (debug)
-      Serial.println("Verbindung fehlgeschlagen!");
-    return false;
-  }
-
-  if (debug)
-    Serial.println("Verbunden!");
-  // ESP32 Erzeugt HTTPS Anfrage an Google sheets
-  String url = "https://" + String(server) + "/macros/s/" + key + "/exec?" + datastr;
-  if (debug)
-    Serial.println(url);
-  wClient.println("GET " + url);
-  wClient.println("Host: script.google.com");
-  wClient.println("Connection: close");
-  wClient.println();
-
-  // ESP32 empfängt antwort vom Google sheets
-  while (wClient.connected()) // ESP32  empfängt Header
-  {
-    line = wClient.readStringUntil('\n');
-    if (debug)
-      Serial.println(line);
-    if (line == "\r")
-      break;                           // Ende Des Headers empfangen
-    if (line.indexOf("Location") >= 0) // Weiterleitung im Header?
-    {                                  // Neue URL merken
-      movedURL = line.substring(line.indexOf(":") + 2);
+  HTTPClient https;
+  Serial.print("[HTTPS] begin...\n");
+  if (https.begin(/* *client, */ "https://" + String(server) + "/macros/s/" + key + "/exec?" + datastr))
+  { // HTTPS
+    Serial.print("[HTTPS] GET...");
+    // start connection and send HTTP header
+    int httpCode = https.GET();
+    // httpCode will be negative on error
+    if (httpCode > 0)
+    { /*
+          // HTTP header has been send and Server response header has been handled
+          // file found at server
+          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+          {
+            String payload = https.getString();
+            Serial.println(payload);
+          } */
+          Serial.println(httpCode);
     }
-  }
-  wClient.stop();
-  return true;
-  /* ToDo  move and error handling should be improved
-  while (wClient.connected())    // Google Antwort HTML Zeilenweise Lesen
-  {
-    if (wClient.available())
+    else
     {
-      line = wClient.readStringUntil('\r');
-      if (debug) Serial.print(line);
+      Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
     }
+    https.end();
   }
-  wClient.stop();
-
-
-
-  movedURL.trim(); // leerzeichen, \n entfernen
-  if (debug) Serial.println("Weiterleitungs URL: \"" + movedURL + "\"");
-
-  if (movedURL.length() < 10) return false; // Weiterleitung nicht da
-
-  if (debug) Serial.println("\n Starte Weiterleitung...");
-  if (!wClient.connect(server, 443))
+  else
   {
-    if (debug) Serial.println("Weiterleitung fehlgeschlagen!");
-    return false;
+    Serial.printf("[HTTPS] Unable to connect\n");
   }
-
-  Serial.println("Verbunden!");
-  // // ESP32 Erzeugt HTTPS Anfrage an Google Tabellen
-  wClient.println("GET " + movedURL);
-  wClient.println("Host: script.google.com");
-  wClient.println("Connection: close");
-  wClient.println();
-
-  while (wClient.connected()) // ESP32  empfängt Header
-  {
-    line = wClient.readStringUntil('\n');
-    if (debug) Serial.println(line);
-    if (line == "\r")break;
-  }
-  
-  while (wClient.connected()) // Google Antwort HTML Zeilenweise Lesen
-  {
-    if (wClient.available())
-    {
-      line = wClient.readStringUntil('\r');
-      if (debug) Serial.print(line);
-    }
-  }
-  wClient.stop();
-  if (line == "Ok") {
-      return true;
-  } else return false;
-
-  */
+  // End extra scoping block
 }
