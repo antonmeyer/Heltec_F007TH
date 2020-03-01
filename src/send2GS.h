@@ -3,9 +3,9 @@
 #include "credentials.h"
 #define debug true
 
-WiFiClientSecure wClient;
+const String URL = "https://script.google.com/macros/s/" + key + "/exec?"; // Server URL
 
-const char *server = "script.google.com"; // Server URL
+HTTPClient httpsClient;
 
 void WiFiinit()
 {
@@ -19,23 +19,22 @@ void WiFiinit()
   Serial.println("");
   Serial.print("IP Addresse: ");
   Serial.println(WiFi.localIP());
+
+  httpsClient.setReuse(true);
 }
 
 void send2google(String datastr)
 {
-
-  HTTPClient https;
   Serial.print("[HTTPS] begin...\n");
-  if (https.begin(/* *client, */ "https://" + String(server) + "/macros/s/" + key + "/exec?" + datastr))
+  if (httpsClient.begin(URL  + datastr))
   { // HTTPS
     Serial.print("[HTTPS] GET...");
     // start connection and send HTTP header
-    int httpCode = https.GET();
+    int httpCode = httpsClient.GET();
     // httpCode will be negative on error
     if (httpCode > 0)
     { /*
           // HTTP header has been send and Server response header has been handled
-          // file found at server
           if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
           {
             String payload = https.getString();
@@ -45,13 +44,12 @@ void send2google(String datastr)
     }
     else
     {
-      Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+      Serial.printf("[HTTPS] GET... failed, error: %s\n", httpsClient.errorToString(httpCode).c_str());
     }
-    https.end();
+    //httpsClient.end();
   }
   else
   {
     Serial.printf("[HTTPS] Unable to connect\n");
   }
-  // End extra scoping block
 }

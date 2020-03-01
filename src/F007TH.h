@@ -1,9 +1,10 @@
 #include <Arduino.h>
-//#include <U8x8lib.h>
+#include <U8x8lib.h>
 #include <heltec.h>
 #include "crc.h"
 //ToDo clean that lib and object oriented conecpt
 
+U8X8_SSD1306_128X64_NONAME_HW_I2C OLED(/*OLED_RST*/ 16, /*OLED_SCL*/ 15, /*OLED_SDA*/ 4);
 //U8X8_SSD1306_128X64_NONAME_SW_I2C OLED(/* clock=*/15, /* data=*/4, /* reset=*/16);
 
 // Variables for Manchester Receiver Logic:
@@ -37,7 +38,7 @@ unsigned long chLastRecv[8];
 char displaystr[20];
 float siTemp;
 
-char tempstr[8][6];
+char tempstr[8][6]; //floating point string per Channel
 
 volatile unsigned long EdgeTime; // zur Speicherung der Zeit
 
@@ -69,12 +70,13 @@ void saveReading(int stnId, int newTemp, int newHum)
     chHum[stnId] = newHum;
 
     unsigned long now = millis();
-    if ((chLastRecv[stnId] > now || (now - chLastRecv[stnId]) > 1000))
-    //this checks are strange
+    uint32_t diff = now - chLastRecv[stnId];
+    if (diff > 1000)
     {
       // checks above seems to avoid too many outpuut
       //digitalWrite(7,HIGH); //is for Oszi trigger
       //delay(1);
+
       chLastRecv[stnId] = now;
 
       int stnId1 = stnId + 1;
@@ -84,15 +86,14 @@ void saveReading(int stnId, int newTemp, int newHum)
       Serial.print(temp2str(stnId));
       Serial.print(":");
       Serial.println(newHum);
-      /*
-      //u8x8.clearLine(stnId1);
+
+      //OLED.clearLine(stnId1);
       OLED.drawGlyph(0, stnId1, ('1' + stnId));
       OLED.drawUTF8(1, stnId1, ": ");
-      char tempstr[6]; //float does not work in Arduino sprintf
-      dtostrf(siTemp, 2, 1, tempstr);
-      snprintf(displaystr, 15, "%s°C %d%%", tempstr, newHum);
-      OLED.drawUTF8(3, stnId1, displaystr);
-*/
+    
+      snprintf(displaystr, 17, "%sC %2d%% %4d", tempstr[stnId], newHum, diff/1000);
+      OLED.drawUTF8(2, stnId1, displaystr);
+
     }
   }
 }
@@ -153,15 +154,15 @@ void RFinit(byte rxpin)
 {
 
   //ToDo wrong place
-  /*OLED.begin();
+  
+  OLED.begin();
   OLED.setFont(u8x8_font_chroma48medium8_r);
   OLED.drawString(0, 0, "Heltec F0007TH");
-  */
-
+  
   eraseManchester(); // clear the array to different nos cause if all zeroes it might think that is a valid 3 packets ie all equal
   chTemp[0] = chTemp[1] = chTemp[2] = chTemp[3] = chTemp[4] = chTemp[5] = chTemp[6] = chTemp[7] = 720;
   chHum[0] = chHum[1] = chHum[2] = chHum[3] = chHum[4] = chHum[5] = chHum[6] = chHum[7] = 0;
-  chLastRecv[0] = chLastRecv[1] = chLastRecv[2] = chLastRecv[3] = chLastRecv[4] = chLastRecv[5] = chLastRecv[6] = chLastRecv[7] = 0;
+  chLastRecv[0] = chLastRecv[1] = chLastRecv[2] = chLastRecv[3] = chLastRecv[4] = chLastRecv[5] = chLastRecv[6] = chLastRecv[7] = 1;
 
   pinMode(rxpin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);

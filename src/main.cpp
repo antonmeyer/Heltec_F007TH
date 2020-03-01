@@ -2,15 +2,19 @@
 //#include <heltec.h>
 #include "F007TH.h"
 #include "send2GS.h"
+#include <U8x8lib.h>
 
 #define RxPin 13
 
 unsigned long nextsend;
-const unsigned int period = 300000;
+const unsigned int period = 120000;
 
 const char *NODEID = "F007TH";
 
 char sendstr[100];
+
+
+
 
 void setup()
 {
@@ -18,6 +22,10 @@ void setup()
 
   Serial.begin(115200);
   Serial.println("Heltec F0007TH");
+
+  Serial.println("before wire");
+  Wire.begin(4,15); // remapping of SPI for OLED
+  Serial.println("after wire");
   //Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/, false /*PABOOST Enable*/, 868E6 /**/);
   //Heltec.display->flipScreenVertically();
   //Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
@@ -34,7 +42,6 @@ void setup()
 
   RFinit(RxPin);
 
-  //send2GS("nodeid=F007TH&values=16.7;67;21.15;66;0;0;13.4;74;16.5;51");
   nextsend = millis(); //update asap
 }
 
