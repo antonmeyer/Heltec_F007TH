@@ -1,11 +1,14 @@
 //#include <WiFiMulti.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include "credentials.h"
-#define debug true
-
-const String URL = "https://script.google.com/macros/s/" + key + "/exec?"; // Server URL
+//#define debug false
 
 HTTPClient httpsClient;
+  WiFiClientSecure client;
+
+const String URL = "https://script.google.com/macros/s/" + key + "/exec?"; // Server URL
+//const String URI = "/macros/s/"+ key + "/exec?";
 
 void WiFiinit()
 {
@@ -20,27 +23,33 @@ void WiFiinit()
   Serial.print("IP Addresse: ");
   Serial.println(WiFi.localIP());
 
+  //WiFi.setTxPower(WIFI_POWER_7dBm);
+
   httpsClient.setReuse(true);
 }
 
 void send2google(String datastr)
 {
+    if (WiFi.status() != WL_CONNECTED)
+    WiFiinit();
+
   Serial.print("[HTTPS] begin...\n");
-  if (httpsClient.begin(URL  + datastr))
+  if (httpsClient.begin(client, URL + datastr))
+  //if (httpsClient.begin("script.google.com", 443, URI +datastr))
   { // HTTPS
     Serial.print("[HTTPS] GET...");
     // start connection and send HTTP header
     int httpCode = httpsClient.GET();
     // httpCode will be negative on error
     if (httpCode > 0)
-    { /*
-          // HTTP header has been send and Server response header has been handled
-          if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
-          {
-            String payload = https.getString();
-            Serial.println(payload);
-          } */
-          Serial.println(httpCode);
+    {
+      // HTTP header has been send and Server response header has been handled
+      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
+      {
+        String payload = httpsClient.getString();
+        // Serial.println(payload);
+      }
+      Serial.println(httpCode);
     }
     else
     {
