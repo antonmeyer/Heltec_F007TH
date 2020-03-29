@@ -95,7 +95,7 @@ void saveReading(int stnId, int newTemp, int newHum)
       //OLED.clearLine(stnId1);
 
       snprintf(displaystr, 17, "%d:%sC %2d%% %4d", stnId1, tempstr[stnId], newHum, diff / 1000);
-     // OLED.drawString(0, stnId1, displaystr);
+      OLED.drawString(0, stnId1, displaystr);
       // Heltec.display->drawString(0, stnId1*8, displaystr);
       // Heltec.display->display();
     }
@@ -157,8 +157,6 @@ void eraseManchester()
 void RFinit(byte rxpin)
 {
   rxstate = 0;
-
-  /*
   //ToDo wrong place
   Wire.begin(4, 15); // remapping of SPI for OLED
   //Wire.setClock(700000);
@@ -166,7 +164,7 @@ void RFinit(byte rxpin)
   OLED.begin();
   OLED.setFont(u8x8_font_chroma48medium8_r);
   OLED.drawString(0, 0, "F0007TH");
-*/
+
   eraseManchester(); // clear the array to different nos cause if all zeroes it might think that is a valid 3 packets ie all equal
   chTemp[0] = chTemp[1] = chTemp[2] = chTemp[3] = chTemp[4] = chTemp[5] = chTemp[6] = chTemp[7] = 720;
   chHum[0] = chHum[1] = chHum[2] = chHum[3] = chHum[4] = chHum[5] = chHum[6] = chHum[7] = 0;
@@ -175,7 +173,6 @@ void RFinit(byte rxpin)
   pinMode(rxpin, INPUT_PULLUP);
   //attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
 }
-
 void check_RF_state(byte rxpin)
 {
 
@@ -197,7 +194,7 @@ void check_RF_state(byte rxpin)
     headerHits = 0;
     nosBits = 6; // starts with 2 Bits???
     nosBytes = 0;
-    rxstate++; //next state
+    rxstate = 1; //next state
     EdgeTime = 0;
     attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
     //break;
@@ -206,12 +203,13 @@ void check_RF_state(byte rxpin)
     {
       detachInterrupt(digitalPinToInterrupt(rxpin));
       Dstop = EdgeTime + sDelay;
+      //Dstop = micros() + sDelay;
       //isrcalled = false; //double check this state handling race condition, noise, does it fit for the timing in all cases?
       rxstate = 2;
       //Serial.println("1");
     }
-    else
-      break;
+    //else
+    //break;
   case 2: // sDelay
     if (micros() > Dstop)
     { // delay passed
@@ -224,9 +222,9 @@ void check_RF_state(byte rxpin)
       Dstop += lDelay; //next stop for state 3
       rxstate = 3;
       //Serial.println("2");
-    }
-    else
-      break; //we have to wait in state 2
+    };
+
+    break;
 
   case 3:
     if (micros() > Dstop)
@@ -239,9 +237,10 @@ void check_RF_state(byte rxpin)
     else
       break; //we have to wait in state 3
   case 4:
-    rxstate = 1;
-    EdgeTime = 0; //double check this state handling race condition, noise, does it fit for the timing in all cases?
+    rxstate = 1; // might change later to 0, is just the default
+        EdgeTime = 0; //double check this state handling race condition, noise, does it fit for the timing in all cases?
     attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
+
     if (digitalRead(rxpin) == tempBit)
     { // if RxPin has not swapped, then bitWaveform is swapping
       // If the header is done, then it means data change is occuring ie 1->0, or 0->1
@@ -252,6 +251,7 @@ void check_RF_state(byte rxpin)
     //****************************//
     // Now process the tempBit state and make data definite 0 or 1's, allow possibility of Pos or Neg Polarity
     byte bitState = tempBit ^ polarity; // if polarity=1, invert the tempBit or if polarity=0, leave it alone.
+
     if (bitState == 1)
     { // 1 data could be header or packet
       if (!firstZero)
@@ -262,7 +262,7 @@ void check_RF_state(byte rxpin)
       else
       {
         add(bitState); // already seen first zero so add bit in
-        //Serial.print("A");
+        Serial.print("A");
       }
     } // end of dealing with ones
     else
@@ -271,16 +271,25 @@ void check_RF_state(byte rxpin)
       if (headerHits < headerBits)
       {
         // Still in header checking phase, more header hits required
+        // landing here means header is corrupted, so it is probably an error
         rxstate = 0;
-        break; // landing here means header is corrupted, so it is probably an error
-      }        // end of detecting a "zero" inside a header
+         Serial.print("B");
+        break;
+      } // end of detecting a "zero" inside a header
       else
       {
         firstZero = true;
         add(bitState);
+        Serial.print("Z");
       } // end of dealing with a first zero
     }   // end of dealing with zero's (in header, first or later zeroes)
-        //next bit
+    //next bit
+    /*
+    if (rxstate == 1)
+    {               //if it has not change to 0 by add bit
+      attachInterrupt(digitalPinToInterrupt(rxpin), RF_ISR, CHANGE);
+      EdgeTime = 0; //double check this state handling race condition, noise, does it fit for the timing in all cases?
+    } */
 
-  } // case statement
+  } // case statement we might disable interrupt, as it is ignored anyhow
 }

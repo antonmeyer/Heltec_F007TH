@@ -4,8 +4,8 @@
 #include "credentials.h"
 //#define debug false
 
-HTTPClient httpsClient;
-  WiFiClientSecure client;
+
+//WiFiClientSecure client;
 
 const String URL = "https://script.google.com/macros/s/" + key + "/exec?"; // Server URL
 //const String URI = "/macros/s/"+ key + "/exec?";
@@ -25,16 +25,21 @@ void WiFiinit()
 
   //WiFi.setTxPower(WIFI_POWER_7dBm);
 
-  httpsClient.setReuse(true);
+  
 }
 
-void send2google(String datastr)
+boolean send2google(String datastr)
 {
-    if (WiFi.status() != WL_CONNECTED)
+  HTTPClient httpsClient;
+  httpsClient.setReuse(false);
+  boolean result;
+  if (WiFi.status() != WL_CONNECTED){
+    Serial.println("Wifi needs erconnect");
     WiFiinit();
-
+  }
+   
   Serial.print("[HTTPS] begin...\n");
-  if (httpsClient.begin(client, URL + datastr))
+  if (httpsClient.begin(URL + datastr))
   //if (httpsClient.begin("script.google.com", 443, URI +datastr))
   { // HTTPS
     Serial.print("[HTTPS] GET...");
@@ -46,19 +51,23 @@ void send2google(String datastr)
       // HTTP header has been send and Server response header has been handled
       if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
       {
-        String payload = httpsClient.getString();
+        //String payload = httpsClient.getString();
         // Serial.println(payload);
-      }
+        result = true;
+      };
       Serial.println(httpCode);
     }
     else
     {
       Serial.printf("[HTTPS] GET... failed, error: %s\n", httpsClient.errorToString(httpCode).c_str());
-    }
-    //httpsClient.end();
+      result = false;
+    };
+    httpsClient.end(); //keep it open??? works for 2min but not for 5 min
   }
   else
   {
     Serial.printf("[HTTPS] Unable to connect\n");
-  }
+    result = false;
+  };
+  return result;
 }
