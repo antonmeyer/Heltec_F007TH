@@ -40,7 +40,7 @@ boolean RFM69::initDevice(unsigned char PinNSS, unsigned char PinDIO0, rfm69type
 	SPI.begin();
 	//SPI.beginTransaction(SPISettings(16000000, MSBFIRST, SPI_MODE0));
 	//init digital i/o DIO0
-	SPI.setFrequency(1000000);
+	SPI.setFrequency(100000);
 	_PinDIO0 = PinDIO0;
 	pinMode(_PinDIO0, INPUT);
 	//set device type
@@ -71,14 +71,15 @@ boolean RFM69::initDevice(unsigned char PinNSS, unsigned char PinDIO0, rfm69type
 
 	//set frequency
 	setFrequency(Frequency);
-	//set modulation
-	setModulation(Modulation);
+	
 	//set bit rate
 	setBitRate(BitRate);
 	setFDEV(fdev);
 	//set packet mode in data mode
 	//writeSPI(RFM69_REG_02_DATAMODUL, readSPI(RFM69_REG_02_DATAMODUL) & 0x9F);
 	writeSPI(RFM69_REG_02_DATAMODUL, RFM69_DATAMODUL_DATAMODE_PACKET);
+	//set modulation
+	setModulation(Modulation);
 	//set PreambleLength
 	setPreambleLength(PreambleLength);
 	//set no sync word
@@ -94,7 +95,7 @@ boolean RFM69::initDevice(unsigned char PinNSS, unsigned char PinDIO0, rfm69type
 	//rfm69.writeSPI(RFM69_REG_38_PAYLOADLENGTH, 0);	// unlimited
 	writeSPI(RFM69_REG_38_PAYLOADLENGTH, FixPktSize); //max FIFO lenght
 	writeSPI(RFM69_REG_37_PACKETCONFIG1, 0x00);		  // fixed length, noCRC, no address filter 0x4 to set interrupt without CRC???
-	//rfm69.writeSPI(RFM69_REG_3C_FIFOTHRESH, MSGBLK1); //first mbus block
+	writeSPI(RFM69_REG_3C_FIFOTHRESH, FixPktSize); //first mbus block
 	
 	return (true);
 }
@@ -153,9 +154,11 @@ boolean RFM69::awaitSizedFrame(unsigned char Size, unsigned long Timeout)
 boolean RFM69::receiveSizedFrame(unsigned char Size)
 {
 	setModeRx();
-	if (readSPI(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_PAYLOADREADY) //RFM69_IRQFLAGS2_FIFOLEVEL) 
+	if (readSPI(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_PAYLOADREADY) //RFM69_IRQFLAGS2_FIFOLEVEL) //
 	//if (digitalRead(this->_PinDIO0))
 	{	setModeStdby();
+
+		//Serial.println("PayloadReady");
 		//FIFO level was reached
 		_RSSILast = readSPI(RFM69_REG_24_RSSIVALUE);
 

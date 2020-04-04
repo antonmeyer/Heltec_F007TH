@@ -16,9 +16,18 @@
 #define RxPin 13
 //#define RxPin 19
 
-#define PinNSS 5
-//#define PinNSS 2
-#define PinDIO0 34
+//#define PinNSS 5
+#define PinNSS 2
+#define PinDIO0 36
+
+/* heltec esp32 lora v2
+// GPIO5  -- SX1278's SCK
+// GPIO19 -- SX1278's MISO
+// GPIO27 -- SX1278's MOSI
+// GPIO18 -- SX1278's CS
+// GPIO14 -- SX1278's RESET
+// so we use for the RFM69 same MISO MOSI SCK but different CS PinNSS
+*/
 //instance RFM69
 RFM69 rfm69;
 int8_t PAind = 13;
@@ -90,6 +99,7 @@ void checkcmd()
 
     if (cmd == 'w')
     {
+      rfm69.setModeStdby();
       regval = strtoul(cmdstr.substring(4, 6).c_str(), &ptr, 16);
       rfm69.writeSPI(reg, regval);
       Serial.print("set ");
@@ -100,7 +110,7 @@ void checkcmd()
     {
       regval = rfm69.readSPI(reg);
       Serial.print(reg, HEX);
-      Serial.print(" was set to: ");
+      Serial.print(" is: ");
     }
 
     Serial.println(regval, HEX);
@@ -113,7 +123,8 @@ void loop()
 
   if (rfm69.receiveSizedFrame(FixPktSize))
   {
-    printmsg();
+    if (rfm69.getLastRSSI() < 160)
+      printmsg();
   }
 
   checkcmd();
@@ -147,5 +158,6 @@ void loop()
     OLED.drawString(0, 7, displaystr);
     nextdraw += 3000;
   }
-*/
+  */
+
 } // end of mainloop

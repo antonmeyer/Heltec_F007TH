@@ -10,7 +10,7 @@ The commercial use of this code is not allowed.
 //#include <heltec.h>
 
 #define MSGBLK1 60	//3o6 length of the first rx block
-#define FixPktSize 66 //max len of the encoded wMBus packet = FIFO Size of RFM69
+#define FixPktSize 64 //max len of the encoded wMBus packet = FIFO Size of RFM69
 
 #define PACKET_OK 0
 #define PACKET_CODING_ERROR 1
