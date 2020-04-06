@@ -11,13 +11,15 @@
 
 #include "esp32-hal-cpu.h"
 
-#include "RFM69mbus.h"
+//#include "RFM69mbus.h"
+#include "sx1276mbus.h"
+SX1276MBUS sx1276mbus;
 
 #define RxPin 13
 //#define RxPin 19
 
-//#define PinNSS 5
-#define PinNSS 2
+#define PinNSS 18 //for sx1276 on Heltec
+//#define PinNSS 2
 #define PinDIO0 36
 
 /* heltec esp32 lora v2
@@ -29,7 +31,8 @@
 // so we use for the RFM69 same MISO MOSI SCK but different CS PinNSS
 */
 //instance RFM69
-RFM69 rfm69;
+//RFM69 rfm69;
+
 int8_t PAind = 13;
 
 #include "msgdecoder.h"
@@ -74,13 +77,14 @@ void setup()
   //RFinit(RxPin);
   nextsend = millis(); //update asap
 
-  if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
+  //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
+  if (!sx1276mbus.initDevice(PinNSS, PinDIO0))
   {
-    Serial.println("error initializing RFM69");
+    Serial.println("error initializing sx1276");
   }
   else
   {
-    Serial.println("RFM69 ready");
+    Serial.println("sx1276 ready");
   };
 }
 
@@ -99,16 +103,16 @@ void checkcmd()
 
     if (cmd == 'w')
     {
-      rfm69.setModeStdby();
+      sx1276mbus.setModeStdby();
       regval = strtoul(cmdstr.substring(4, 6).c_str(), &ptr, 16);
-      rfm69.writeSPI(reg, regval);
+      sx1276mbus.writeSPI(reg, regval);
       Serial.print("set ");
       Serial.print(reg, HEX);
       Serial.print(" to ");
     }
     if (cmd == 'r')
     {
-      regval = rfm69.readSPI(reg);
+      regval = sx1276mbus.readSPI(reg);
       Serial.print(reg, HEX);
       Serial.print(" is: ");
     }
@@ -121,10 +125,14 @@ void loop()
 {
   //check_RF_state(RxPin);
 
-  if (rfm69.receiveSizedFrame(FixPktSize))
+  if (sx1276mbus.receiveSizedFrame(FixPktSize))
   {
-    if (rfm69.getLastRSSI() < 160)
-      printmsg();
+    if (sx1276mbus.getLastRSSI() < 160)
+    /*for (int j=0; j < sx1276mbus._RxBufferLen; j++) {
+      Serial.print(sx1276mbus._RxBuffer[j],HEX);
+    }
+    Serial.println();*/
+      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen);
   }
 
   checkcmd();

@@ -16,8 +16,8 @@ The commercial use of this code is not allowed.
 #define PACKET_CODING_ERROR 1
 #define PACKET_CRC_ERROR 2
 
-#ifndef RFM69_h
-#define RFM69_h
+#ifndef RFM69mbus_h
+#define RFM69mbus_h
 
 // Register names
 #define RFM69_REG_00_FIFO 0x00
@@ -287,19 +287,14 @@ enum mode
 	rfm69RX
 };
 
-static const unsigned char LenOk = 0x1;
-static const unsigned char LenErr = 0x2;
-static const unsigned char DecErr = 0x4;
-static const unsigned char CRCErr = 0x8;
+
 
 class RFM69
 {
 public:
 	boolean initDevice(unsigned char PinNSS, unsigned char PinDIO0, rfm69type DeviceType, float Frequency, modulation Modulation, unsigned long BitRate, unsigned long fdev, int PreambleLength, int8_t TxPower);
-	boolean awaitSizedFrame(unsigned char Size, unsigned long Timeout);
 	boolean receiveSizedFrame(unsigned char Size);
 	unsigned char rxMBusMsg(); //returns status
-	boolean waitForChannelFree(float RSSI_Threshold, unsigned long TimeoutFreeChannel);
 
 	void setModulation(modulation Modulation);
 	void setBitRateAndFdev(unsigned long BitRate);
@@ -318,10 +313,10 @@ public:
 	void printRegister(unsigned char Reg);
 	void writeReg(uint8_t addr, uint8_t value);
 	//unsigned char _RxBuffer[RFM69_MAX_MESSAGE_LEN];
-	unsigned char _RxBuffer[255];
+	unsigned char _RxBuffer[FixPktSize];
 	unsigned char _RxBufferLen;
 	boolean _HighPowerDevice;
-	unsigned char _mbusmsg[180];
+	unsigned char _mbusmsg[FixPktSize*2/3];
 	unsigned char msgerr; // 0 nothing received, 1 len ok, 2 len error, 4 3o6 error
 	unsigned char _msgLen;
 	unsigned char writeSPI(unsigned char Reg, unsigned char Val);
@@ -329,8 +324,6 @@ public:
 	void readFifo(unsigned char *buffer, unsigned char length);
 	void setBitRate(unsigned long BitRate);
 	void setFDEV(unsigned long fdev);
-	unsigned char decode3o6(unsigned char *encodedData, unsigned char *decodedData, unsigned char lastByte);
-	unsigned char decode3o6Block(unsigned char *encoded, unsigned char *decoded, unsigned char encodedSize);
 	uint16_t crcCalc(uint16_t crcReg, uint8_t crcData);
 
 private:
@@ -338,7 +331,6 @@ private:
 	void setPreambleLength(int Bytes);
 	void setOverCurrentProtection(boolean On);
 	void setOpMode(unsigned char Mode);
-	boolean checkIsChannelFree(float RSSI_Threshold);
 
 	unsigned char writeSPIBurst(unsigned char Reg, const unsigned char *Src, unsigned char Len);
 	
@@ -351,90 +343,4 @@ private:
 	unsigned char _CalibrationTempVal;
 };
 
-void encode3outof6(uint8_t *uncodedData, uint8_t *encodedData, uint8_t lastByte);
-
-// Table for encoding for a 4-bit data into 6-bit
-// "3 out of 6" coded data.
-static uint8_t encodeTab[16] = {0x16,  // 0x0 "3 out of 6" encoded
-								0x0D,  // 0x1 "3 out of 6" encoded
-								0x0E,  // 0x2 "3 out of 6" encoded
-								0x0B,  // 0x3 "3 out of 6" encoded
-								0x1C,  // 0x4 "3 out of 6" encoded
-								0x19,  // 0x5 "3 out of 6" encoded
-								0x1A,  // 0x6 "3 out of 6" encoded
-								0x13,  // 0x7 "3 out of 6" encoded
-								0x2C,  // 0x8 "3 out of 6" encoded
-								0x25,  // 0x9 "3 out of 6" encoded
-								0x26,  // 0xA "3 out of 6" encoded
-								0x23,  // 0xB "3 out of 6" encoded
-								0x34,  // 0xC "3 out of 6" encoded
-								0x31,  // 0xD "3 out of 6" encoded
-								0x32,  // 0xE "3 out of 6" encoded
-								0x29}; // 0xF "3 out of 6" encoded
-
-static unsigned char decodeTab[64] = {0xFF,  //  "3 out of 6" encoded 0x00 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x01 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x02 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x03 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x04 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x05 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x06 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x07 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x08 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x09 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x0A decoded
-									  0x03,  //  "3 out of 6" encoded 0x0B decoded
-									  0xFF,  //  "3 out of 6" encoded 0x0C decoded
-									  0x01,  //  "3 out of 6" encoded 0x0D decoded
-									  0x02,  //  "3 out of 6" encoded 0x0E decoded
-									  0xFF,  //  "3 out of 6" encoded 0x0F decoded
-									  0xFF,  //  "3 out of 6" encoded 0x10 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x11 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x12 decoded
-									  0x07,  //  "3 out of 6" encoded 0x13 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x14 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x15 decoded
-									  0x00,  //  "3 out of 6" encoded 0x16 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x17 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x18 decoded
-									  0x05,  //  "3 out of 6" encoded 0x19 decoded
-									  0x06,  //  "3 out of 6" encoded 0x1A decoded
-									  0xFF,  //  "3 out of 6" encoded 0x1B decoded
-									  0x04,  //  "3 out of 6" encoded 0x1C decoded
-									  0xFF,  //  "3 out of 6" encoded 0x1D decoded
-									  0xFF,  //  "3 out of 6" encoded 0x1E decoded
-									  0xFF,  //  "3 out of 6" encoded 0x1F decoded
-									  0xFF,  //  "3 out of 6" encoded 0x20 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x21 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x22 decoded
-									  0x0B,  //  "3 out of 6" encoded 0x23 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x24 decoded
-									  0x09,  //  "3 out of 6" encoded 0x25 decoded
-									  0x0A,  //  "3 out of 6" encoded 0x26 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x27 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x28 decoded
-									  0x0F,  //  "3 out of 6" encoded 0x29 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x2A decoded
-									  0xFF,  //  "3 out of 6" encoded 0x2B decoded
-									  0x08,  //  "3 out of 6" encoded 0x2C decoded
-									  0xFF,  //  "3 out of 6" encoded 0x2D decoded
-									  0xFF,  //  "3 out of 6" encoded 0x2E decoded
-									  0xFF,  //  "3 out of 6" encoded 0x2F decoded
-									  0xFF,  //  "3 out of 6" encoded 0x30 decoded
-									  0x0D,  //  "3 out of 6" encoded 0x31 decoded
-									  0x0E,  //  "3 out of 6" encoded 0x32 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x33 decoded
-									  0x0C,  //  "3 out of 6" encoded 0x34 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x35 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x36 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x37 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x38 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x39 decoded
-									  0xFF,  //  "3 out of 6" encoded 0x3A decoded
-									  0xFF,  //  "3 out of 6" encoded 0x3B decoded
-									  0xFF,  //  "3 out of 6" encoded 0x3C decoded
-									  0xFF,  //  "3 out of 6" encoded 0x3D decoded
-									  0xFF,  //  "3 out of 6" encoded 0x3E decoded
-									  0xFF}; // "3 out of 6" encoded 0x3F decoded
-
-#endif
+#endif //RFM69_h

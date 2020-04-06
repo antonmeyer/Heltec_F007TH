@@ -1,6 +1,8 @@
 //just some encapsulations for value extracting
 //be careful: Byte ordering ntoh function include did not work
 
+#include "decoder3o6.h"
+
 static inline uint32_t get_serial(const uint8_t *const packet)
 {
     uint32_t serial;
@@ -61,55 +63,57 @@ static inline uint16_t get_prevHKZ(const uint8_t *const packet)
     return prevHKZ;
 }
 
-void printmsg()
+
+
+void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen)
 {
-    //if (rfm69.receiveSizedFrame(27)) {
 
-    unsigned char RSSI = rfm69.getLastRSSI();
+    unsigned char mBusMsg [64];
 
-    //if (RSSI < 200)
-    { 
-        
-        rfm69.decode3o6Block(rfm69._RxBuffer, rfm69._mbusmsg, rfm69._RxBufferLen);
+    //unsigned char RSSI = rfm69.getLastRSSI();
+
+    {
+
+        decode3o6Block(RxBuffer, mBusMsg, RxBufferlen);
         Serial.print("mbmsg: ");
-        //for (i = 0; i < rfm69._mbusmsg[0] + 1; i++)
-        for (uint8_t i = 0; i < rfm69._RxBufferLen * 2 / 3; i++)
+        //for (i = 0; i < mBusMsg[0] + 1; i++)
+        for (uint8_t i = 0; i < RxBufferlen * 2 / 3; i++)
         {
             char tempstr[3];
-            sprintf(tempstr, "%02X", rfm69._mbusmsg[i]);
+            sprintf(tempstr, "%02X", mBusMsg[i]);
             Serial.print(tempstr);
         }
         Serial.print(":");
-        Serial.print((rfm69._RxBufferLen * 2 / 3), HEX);
-
+        Serial.println((RxBufferlen * 2 / 3), HEX);
+        /*
         Serial.print(":");
         Serial.println(RSSI/-2);
-        
-        uint16_t mtype = get_type(rfm69._mbusmsg);
+  */
+        uint16_t mtype = get_type(mBusMsg);
 
         Serial.print("msgdec: ");
-        Serial.print(get_vendor(rfm69._mbusmsg), HEX);
+        Serial.print(get_vendor(mBusMsg), HEX);
         Serial.print(";");
-        Serial.print(get_serial(rfm69._mbusmsg), HEX);
+        Serial.print(get_serial(mBusMsg), HEX);
         Serial.print(";");
         Serial.print(mtype, HEX);
         Serial.print(";");
 
         if (mtype == 0x8069)
         {
-            Serial.print(get_temp1(rfm69._mbusmsg));
+            Serial.print(get_temp1(mBusMsg));
             Serial.print(";");
-            Serial.print(get_temp2(rfm69._mbusmsg));
+            Serial.print(get_temp2(mBusMsg));
             Serial.print(";");
-            Serial.print(get_actHKZ(rfm69._mbusmsg));
+            Serial.print(get_actHKZ(mBusMsg));
             Serial.print(";");
-            Serial.println(get_prevHKZ(rfm69._mbusmsg));
+            Serial.println(get_prevHKZ(mBusMsg));
         }
         else if ((mtype & 0xFF00) == 0x4300)
         {
-            Serial.print(get_last(rfm69._mbusmsg));
+            Serial.print(get_last(mBusMsg));
             Serial.print(";");
-            Serial.println(get_current(rfm69._mbusmsg));
+            Serial.println(get_current(mBusMsg));
         }
         else
         {
