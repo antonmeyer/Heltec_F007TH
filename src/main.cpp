@@ -2,7 +2,7 @@
 //#include <heltec.h>
 #include "F007TH.h"
 #include "send2GS.h"
-//#include <U8x8lib.h>
+#include <U8x8lib.h>
 
 #include "zeit.h"
 
@@ -15,12 +15,12 @@
 #include "sx1276mbus.h"
 SX1276MBUS sx1276mbus;
 
-#define RxPin 13
+#define RxPin 38 //ESP32 input only
 //#define RxPin 19
 
-#define PinNSS 18 //for sx1276 on Heltec
+#define PinNSS 18 //for sx1276 on Heltec v2
 //#define PinNSS 2
-#define PinDIO0 36
+#define PinDIO0 26 //for sx1276 on Heltec v2
 
 /* heltec esp32 lora v2
 // GPIO5  -- SX1278's SCK
@@ -34,6 +34,14 @@ SX1276MBUS sx1276mbus;
 //RFM69 rfm69;
 
 int8_t PAind = 13;
+
+U8X8_SSD1306_128X64_NONAME_HW_I2C OLED(/*OLED_RST*/ 16, /*OLED_SCL*/ 15, /*OLED_SDA*/ 4);
+//U8X8_SSD1306_128X64_NONAME_SW_I2C OLED(/* clock=*/15, /* data=*/4, /* reset=*/16);
+//U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2 (U8G2_R0, 16, 15, 4)
+
+// 1.3" OLED
+//U8X8_SH1106_128X64_NONAME_HW_I2C OLED(/* reset=*/U8X8_PIN_NONE);
+char displaystr[20];
 
 #include "msgdecoder.h"
 
@@ -61,6 +69,14 @@ void setup()
   Serial.println(NODEID);
   Serial.println(ESP.getFreeHeap());
 
+  //ToDo wrong place
+  Wire.begin(4, 15); // remapping of SPI for OLED
+  //Wire.setClock(700000);
+
+  OLED.begin();
+  OLED.setFont(u8x8_font_chroma48medium8_r);
+  OLED.drawString(0, 0, "F0007TH");
+
   //Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/, false /*PABOOST Enable*/, 868E6 /**/);
   //Heltec.display->flipScreenVertically();
   //Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
@@ -74,7 +90,7 @@ void setup()
   // ToDo disable ISR during reconnect
   WiFiinit();
 
-  //RFinit(RxPin);
+  RFinit(RxPin);
   nextsend = millis(); //update asap
 
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
@@ -123,7 +139,14 @@ void checkcmd()
 
 void loop()
 {
-  //check_RF_state(RxPin);
+ byte idx =  check_RF_state(RxPin);
+ if (idx >0 ) { 
+   // ToDo decouple it object driffen approach
+    //OLED.clearLine(idx);
+    snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx-1],chHum[idx-1], diff / 1000);
+    OLED.drawString(0, idx, displaystr);
+ }
+ 
 
   if (sx1276mbus.receiveSizedFrame(FixPktSize))
   {

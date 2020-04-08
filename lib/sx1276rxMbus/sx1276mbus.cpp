@@ -68,6 +68,8 @@ boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
     
     //writeSPI(RFM69_REG_3C_FIFOTHRESH, FixPktSize);    //first mbus block
 
+    //DIO0 -> GPIO26 could be used for PayloadReady, DIO1-> GPIO35 for FIFO, DIO2 -> GPIO34 for syncAddr 
+
     return (true);
 }
 
@@ -102,7 +104,7 @@ void SX1276MBUS::setFrequency(float Frequency)
     writeSPI(REG_FRFLSB, Frf & 0xff);
 }
 
-void SX1276MBUS::setFDEV( uint16_t fdev )
+void SX1276MBUS::setFDEV( uint32_t fdev )
 {
     uint16_t fdevtemp = ( uint16_t )( ( double )fdev / ( double )sx1276_FSTEP );
      writeSPI( REG_FDEVMSB, ( uint8_t )( fdevtemp >> 8 ) );

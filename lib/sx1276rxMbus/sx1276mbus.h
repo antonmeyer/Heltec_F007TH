@@ -41,7 +41,7 @@ public:
 	boolean initDevice(unsigned char PinNSS, unsigned char PinDIO0);
 	boolean receiveSizedFrame(unsigned char Size);
 	
-	void setFDEV( uint16_t fdev );
+	void setFDEV( uint32_t fdev );
 	void setFrequency(float Frequency);
 	void setBitRate( uint32_t bitrate );
 	void setSyncWords(unsigned char *SyncWords, unsigned char Len);
@@ -51,12 +51,8 @@ public:
 	float convertRSSIToRSSIdBm(unsigned char RSSI);
 	int readTemperature();
 	void setCalibrationTemp(unsigned char Val);
-	void setModeSleep();
 	void setModeStdby();
 	void setModeRx();
-	void printRegisters();
-	void printRegister(unsigned char Reg);
-	void writeReg(uint8_t addr, uint8_t value);
 	//unsigned char _RxBuffer[RFM69_MAX_MESSAGE_LEN];
 	unsigned char _RxBuffer[FixPktSize];
 	unsigned char _RxBufferLen;
