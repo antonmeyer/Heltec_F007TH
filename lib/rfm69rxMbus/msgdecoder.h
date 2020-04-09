@@ -63,61 +63,60 @@ static inline uint16_t get_prevHKZ(const uint8_t *const packet)
     return prevHKZ;
 }
 
+unsigned char mBusMsg[64];
 
-
-void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen)
+void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen, byte rx_rssi)
 {
-
-    unsigned char mBusMsg [64];
-
     //unsigned char RSSI = rfm69.getLastRSSI();
-
     {
+        memset(mBusMsg, 0, sizeof(mBusMsg));
+        if (decode3o6Block(RxBuffer, mBusMsg, RxBufferlen) != DecErr)
+        {
 
-        decode3o6Block(RxBuffer, mBusMsg, RxBufferlen);
-        Serial.print("mbmsg: ");
-        //for (i = 0; i < mBusMsg[0] + 1; i++)
-        for (uint8_t i = 0; i < RxBufferlen * 2 / 3; i++)
-        {
-            char tempstr[3];
-            sprintf(tempstr, "%02X", mBusMsg[i]);
-            Serial.print(tempstr);
-        }
-        Serial.print(":");
-        Serial.println((RxBufferlen * 2 / 3), HEX);
-        /*
-        Serial.print(":");
-        Serial.println(RSSI/-2);
-  */
-        uint16_t mtype = get_type(mBusMsg);
+            Serial.print("mbmsg: ");
+            //for (i = 0; i < mBusMsg[0] + 1; i++)
+            for (uint8_t i = 0; i < RxBufferlen * 2 / 3; i++)
+            {
+                char tempstr[3];
+                sprintf(tempstr, "%02X", mBusMsg[i]);
+                Serial.print(tempstr);
+            }
+            Serial.print(":");
+            Serial.print((RxBufferlen * 2 / 3), HEX);
 
-        Serial.print("msgdec: ");
-        Serial.print(get_vendor(mBusMsg), HEX);
-        Serial.print(";");
-        Serial.print(get_serial(mBusMsg), HEX);
-        Serial.print(";");
-        Serial.print(mtype, HEX);
-        Serial.print(";");
+            Serial.print(":");
+            Serial.println(rx_rssi / -2.0);
 
-        if (mtype == 0x8069)
-        {
-            Serial.print(get_temp1(mBusMsg));
+            uint16_t mtype = get_type(mBusMsg);
+
+            Serial.print("msgdec: ");
+            Serial.print(get_vendor(mBusMsg), HEX);
             Serial.print(";");
-            Serial.print(get_temp2(mBusMsg));
+            Serial.print(get_serial(mBusMsg), HEX);
             Serial.print(";");
-            Serial.print(get_actHKZ(mBusMsg));
+            Serial.print(mtype, HEX);
             Serial.print(";");
-            Serial.println(get_prevHKZ(mBusMsg));
+
+            if (mtype == 0x8069)
+            {
+                Serial.print(get_temp1(mBusMsg));
+                Serial.print(";");
+                Serial.print(get_temp2(mBusMsg));
+                Serial.print(";");
+                Serial.print(get_actHKZ(mBusMsg));
+                Serial.print(";");
+                Serial.println(get_prevHKZ(mBusMsg));
+            }
+            else if ((mtype & 0xFF00) == 0x4300)
+            {
+                Serial.print(get_last(mBusMsg));
+                Serial.print(";");
+                Serial.println(get_current(mBusMsg));
+            }
+            else
+            {
+                Serial.println();
+            };
         }
-        else if ((mtype & 0xFF00) == 0x4300)
-        {
-            Serial.print(get_last(mBusMsg));
-            Serial.print(";");
-            Serial.println(get_current(mBusMsg));
-        }
-        else
-        {
-            Serial.println();
-        };
     }
 }

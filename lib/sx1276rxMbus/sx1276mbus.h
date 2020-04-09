@@ -6,7 +6,7 @@
 
 #include "sx1276Regs-Fsk.h"
 
-#define FixPktSize 63
+#define FixPktSize 48
 
 // The crystal oscillator frequency of the RF69 module
 #define sx1276_FXOSC 32000000.

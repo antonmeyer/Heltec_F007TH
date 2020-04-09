@@ -8,8 +8,8 @@ boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
     //no syncword, no encryption, RSSI Threshold -114dBm, power 13, mode stdby
     //----------------------------------------------------------------------------------------------
     unsigned char Type;
-    unsigned char SyncConfig;
-    //init SPI
+  
+      //init SPI
     _PinNSS = PinNSS;
     pinMode(_PinNSS, OUTPUT);
     digitalWrite(_PinNSS, HIGH);

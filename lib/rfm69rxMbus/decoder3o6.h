@@ -3,6 +3,8 @@
 #define DECODING_3OUTOF6_OK 0
 #define DECODING_3OUTOF6_ERROR 1
 
+
+
 static const unsigned char LenOk = 0x1;
 static const unsigned char LenErr = 0x2;
 static const unsigned char DecErr = 0x4;

@@ -65,7 +65,7 @@ void printVals(int stnId)
 }
 
 byte add(byte bitData)
-//if new data return index otherwise 0
+//if new data returns index otherwise 0
 {
   byte res = 0;
   dataByte = (dataByte << 1) | bitData;
@@ -154,7 +154,6 @@ byte check_RF_state(byte rxpin)
 
   switch (rxstate)
   {
-
   case 0:               // new packet
     tempBit = polarity; // these begin the same for a packet
     firstZero = false;
@@ -241,11 +240,11 @@ byte check_RF_state(byte rxpin)
       }        // end of detecting a "zero" inside a header
       else
       {
-        firstZero = true;
+        firstZero = true; // could be called multiple times
         res = add(bitState);
-      }       // end of dealing with a first zero; we could never ever have a valid message yet, but strange ..it happens
+      }       
     }         // end of dealing with zero's (in header, first or later zeroes)
               //next bit
-  }           // case statement
+  }           // switch statement
   return res; //preset to 0;  idx when success
 }
