@@ -142,7 +142,7 @@ void loop()
  byte idx =  check_RF_state(RxPin);
  if (idx >0 ) { 
    // ToDo decouple it object driffen approach
-    //OLED.clearLine(idx);
+    OLED.clearLine(idx);
     snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx-1],chHum[idx-1], diff / 1000);
     OLED.drawString(0, idx, displaystr);
  }
@@ -150,12 +150,19 @@ void loop()
 
   if (sx1276mbus.receiveSizedFrame(FixPktSize))
   {
-    if (sx1276mbus.getLastRSSI() < 160)
-    /*for (int j=0; j < sx1276mbus._RxBufferLen; j++) {
-      Serial.print(sx1276mbus._RxBuffer[j],HEX);
+    byte RSSI = sx1276mbus.getLastRSSI();
+    if ( RSSI < 200) {
+      
+      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI );
+      uint32_t myheatmeterserial = get_serial(mBusMsg);
+     
+      if (0x30585388 == myheatmeterserial) {
+        char str[12];
+        sprintf(str, "%ul", get_current(mBusMsg));
+        OLED.drawString(10,0, str);
+      }
+
     }
-    Serial.println();*/
-      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen);
   }
 
   checkcmd();
