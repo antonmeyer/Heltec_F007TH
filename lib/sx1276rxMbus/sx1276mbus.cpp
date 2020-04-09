@@ -38,9 +38,10 @@ boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
 
     //set LNA AGC
     writeSPI(REG_LNA, RF_LNA_GAIN_G1);
-    writeSPI(REG_RXCONFIG, RF_RXCONFIG_AGCAUTO_ON | RF_RXCONFIG_AFCAUTO_ON);
+    writeSPI(REG_RXCONFIG, RF_RXCONFIG_AGCAUTO_ON | RF_RXCONFIG_AFCAUTO_OFF);
     //set DCC 4% and 333 kHz bandwidth
-    writeSPI(REG_RXBW, RF_RXBW_MANT_16 |  RF_RXBW_EXP_1);  // 250 kHz ToDo not 100% for sure
+    writeSPI(REG_RXBW, RF_RXBW_MANT_20 |  RF_RXBW_EXP_1);  // 200 kHz ToDo not 100% for sure
+    writeSPI(REG_AFCBW, RF_RXBW_MANT_20 | RF_RXBW_EXP_1);
 
     // ToDo writeSPI(REG_AFCBW, 0xF0); //was E0 changed to F0 = 333 kHz E8
     //writeSPI(RFM69_REG_1E_AFCFEI, 0x4); //AfcAutoOn
@@ -54,18 +55,18 @@ boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
     setFDEV(50000);
 
     //preamble settings
-    writeSPI(REG_PREAMBLEDETECT, RF_PREAMBLEDETECT_DETECTOR_ON | RF_PREAMBLEDETECT_DETECTORSIZE_2 | RF_PREAMBLEDETECT_DETECTORTOL_10);
+    writeSPI(REG_PREAMBLEDETECT, RF_PREAMBLEDETECT_DETECTOR_ON | RF_PREAMBLEDETECT_DETECTORSIZE_1 | RF_PREAMBLEDETECT_DETECTORTOL_2);
 
     //set sync words
-    unsigned char SyncBytes[] = { 0x54, 0x3D}; // lets start relaxed
+    writeSPI(REG_SYNCCONFIG, RF_SYNCCONFIG_PREAMBLEPOLARITY_55);
+    unsigned char SyncBytes[] = { 0x55, 0x54, 0x3D}; // 0b010101 01010100 00111101u wMBus sync
     setSyncWords(SyncBytes, sizeof(SyncBytes));
     useSyncWords(true);
-
+    
     writeSPI(REG_PACKETCONFIG1, RF_PACKETCONFIG1_PACKETFORMAT_FIXED );
     writeSPI(REG_PACKETCONFIG2, RF_PACKETCONFIG2_DATAMODE_PACKET);       // fixed length, MSBs of length = 0
     writeSPI(REG_PAYLOADLENGTH, FixPktSize); //max FIFO lenght
    
-    
     //writeSPI(RFM69_REG_3C_FIFOTHRESH, FixPktSize);    //first mbus block
 
     //DIO0 -> GPIO26 could be used for PayloadReady, DIO1-> GPIO35 for FIFO, DIO2 -> GPIO34 for syncAddr 
@@ -73,7 +74,7 @@ boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
     return (true);
 }
 
-boolean SX1276MBUS::receiveSizedFrame(unsigned char Size)
+boolean SX1276MBUS::receiveSizedFrame(unsigned char Size, unsigned char minRSSI)
 {
     setModeRx();
     if (readSPI(REG_IRQFLAGS2) & RF_IRQFLAGS2_PAYLOADREADY) //RFM69_IRQFLAGS2_FIFOLEVEL) //
@@ -84,6 +85,8 @@ boolean SX1276MBUS::receiveSizedFrame(unsigned char Size)
         //Serial.println("PayloadReady");
         //FIFO level was reached
         _RSSILast = readSPI(REG_RSSIVALUE);
+
+        if (_RSSILast > minRSSI) return (false);
 
         readFifo(_RxBuffer, Size);
         //this->msgerr = decode3o6(_RxBuffer,_mbusmsg,0);

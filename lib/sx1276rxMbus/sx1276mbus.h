@@ -39,7 +39,7 @@ class SX1276MBUS
 {
 public:
 	boolean initDevice(unsigned char PinNSS, unsigned char PinDIO0);
-	boolean receiveSizedFrame(unsigned char Size);
+	boolean receiveSizedFrame(unsigned char Size, unsigned char minRSSI);
 	
 	void setFDEV( uint32_t fdev );
 	void setFrequency(float Frequency);

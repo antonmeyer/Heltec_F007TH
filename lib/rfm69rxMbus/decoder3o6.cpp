@@ -49,7 +49,7 @@ unsigned char decode3o6Block(unsigned char *encoded, unsigned char *decoded, uns
     unsigned char bytesRemaining;
     unsigned char decodingStatus = 0;
 
-    bytesRemaining = encodedSize;
+    bytesRemaining = encodedSize*2/3;
 
 #ifdef debug_decoder
     Serial.print("raw: ");
@@ -64,7 +64,7 @@ unsigned char decode3o6Block(unsigned char *encoded, unsigned char *decoded, uns
     while (bytesRemaining && (decodingStatus != DecErr) )
     {
 
-        // If last byte ..strange what about 2 last bytes ..something is wired here
+        // If last byte 
         if (bytesRemaining == 1)
         {
             decodingStatus = decode3o6(encoded, decoded, 1);
@@ -73,7 +73,7 @@ unsigned char decode3o6Block(unsigned char *encoded, unsigned char *decoded, uns
         else
         {
             decodingStatus = decode3o6(encoded, decoded, 0);
-            bytesRemaining -= 3;
+            bytesRemaining -= 2;
 
             encoded += 3;
             decoded += 2;

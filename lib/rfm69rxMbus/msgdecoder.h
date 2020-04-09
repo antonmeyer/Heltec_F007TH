@@ -72,7 +72,7 @@ void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen, byte rx_rssi)
         memset(mBusMsg, 0, sizeof(mBusMsg));
         if (decode3o6Block(RxBuffer, mBusMsg, RxBufferlen) != DecErr)
         {
-
+#ifdef debug_decoder
             Serial.print("mbmsg: ");
             //for (i = 0; i < mBusMsg[0] + 1; i++)
             for (uint8_t i = 0; i < RxBufferlen * 2 / 3; i++)
@@ -86,10 +86,12 @@ void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen, byte rx_rssi)
 
             Serial.print(":");
             Serial.println(rx_rssi / -2.0);
-
+#endif
             uint16_t mtype = get_type(mBusMsg);
 
             Serial.print("msgdec: ");
+            Serial.print(rx_rssi / -2.0);
+            Serial.print(":");
             Serial.print(get_vendor(mBusMsg), HEX);
             Serial.print(";");
             Serial.print(get_serial(mBusMsg), HEX);
@@ -117,6 +119,7 @@ void printmsg(unsigned char RxBuffer[], unsigned char RxBufferlen, byte rx_rssi)
             {
                 Serial.println();
             };
-        }
+        } // end if no errer
+        else Serial.print(rx_rssi/-2.0);
     }
 }

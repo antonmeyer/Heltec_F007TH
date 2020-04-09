@@ -94,7 +94,7 @@ void setup()
   nextsend = millis(); //update asap
 
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
-  if (!sx1276mbus.initDevice(PinNSS, PinDIO0))
+  if (!sx1276mbus.initDevice(PinNSS, PinDIO0)) //minRSSI
   {
     Serial.println("error initializing sx1276");
   }
@@ -139,6 +139,7 @@ void checkcmd()
 
 void loop()
 {
+  /*
  byte idx =  check_RF_state(RxPin);
  if (idx >0 ) { 
    // ToDo decouple it object driffen approach
@@ -146,12 +147,12 @@ void loop()
     snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx-1],chHum[idx-1], diff / 1000);
     OLED.drawString(0, idx, displaystr);
  }
- 
+ */
 
-  if (sx1276mbus.receiveSizedFrame(FixPktSize))
+  if (sx1276mbus.receiveSizedFrame(FixPktSize, 170)) //minRSSI to reduce noice load
   {
     byte RSSI = sx1276mbus.getLastRSSI();
-    if ( RSSI < 200) {
+    if ( RSSI < 250) {
       
       printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI );
       uint32_t myheatmeterserial = get_serial(mBusMsg);
