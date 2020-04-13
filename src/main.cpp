@@ -46,13 +46,14 @@ char displaystr[20];
 #include "msgdecoder.h"
 
 unsigned long nextsend;
-const unsigned long period = 300000;
+const unsigned long period = 300000; //period to send to google spreadsheet
 
 unsigned int nextdraw = 0;
 
-const char *NODEID = "F007TH";
+const char *NODEID = "F007TH_Techem"; // names the spreadsheet
 
 char sendstr[100];
+unsigned long mytechemVal =0;
 
 void setup()
 {
@@ -139,7 +140,7 @@ void checkcmd()
 
 void loop()
 {
-  /*
+  
  byte idx =  check_RF_state(RxPin);
  if (idx >0 ) { 
    // ToDo decouple it object driffen approach
@@ -147,35 +148,37 @@ void loop()
     snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx-1],chHum[idx-1], diff / 1000);
     OLED.drawString(0, idx, displaystr);
  }
- */
+ 
 
   if (sx1276mbus.receiveSizedFrame(FixPktSize, 170)) //minRSSI to reduce noice load
   {
     byte RSSI = sx1276mbus.getLastRSSI();
-    if ( RSSI < 250) {
-      
-      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI );
-      uint32_t myheatmeterserial = get_serial(mBusMsg);
-     
-      if (0x30585388 == myheatmeterserial) {
-        char str[12];
-        sprintf(str, "%ul", get_current(mBusMsg));
-        OLED.drawString(10,0, str);
-      }
+    if (RSSI < 250)
+    {
 
+      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI);
+      uint32_t myheatmeterserial = get_serial(mBusMsg);
+
+      if (0x30585388 == myheatmeterserial)
+      {
+        mytechemVal = get_current(mBusMsg);
+        char str[12];
+        sprintf(str, "%lu",mytechemVal );
+        OLED.drawString(10, 0, str);
+      }
     }
   }
 
   checkcmd();
-  /*
+
   if ((millis() > nextsend) && (rxstate == 0))
   //rxstate 0 is in the beginning, waitung for the first edge, ISR disabled
   {
-    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%lu;%s;%d;%lu;%s;%d;%lu;%s;%d;%lu", NODEID,
-             temp2str(0), chHum[0], chLastRecv[0],
-             temp2str(1), chHum[1], chLastRecv[1],
-             temp2str(2), chHum[2], chLastRecv[2],
-             temp2str(3), chHum[3], chLastRecv[3]);
+    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%lu", NODEID,
+            temp2str(0), chHum[0], temp2str(1), chHum[1], temp2str(2), chHum[2],
+            temp2str(3), chHum[3], temp2str(4), chHum[4], temp2str(5), chHum[5],
+            temp2str(6), chHum[6],
+            mytechemVal);
     Serial.println(sendstr);
     if (send2google(sendstr))
     {
@@ -185,10 +188,10 @@ void loop()
     {
       nextsend += 30000; // send nok retry 30s later
     }
-    
-        Serial.println(ESP.getMinFreeHeap());
+
+    Serial.println(ESP.getMinFreeHeap());
   }
-  */
+
   /*
   if ((millis() > nextdraw) ) //&& (rxstate == 0))
   {
