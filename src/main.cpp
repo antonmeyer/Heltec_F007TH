@@ -50,10 +50,19 @@ const unsigned long period = 300000; //period to send to google spreadsheet
 
 unsigned int nextdraw = 0;
 
-const char *NODEID = "F007TH_Techem"; // names the spreadsheet
+const char *NODEID = "F007TH"; // names the spreadsheet
+const char *NODEID2 = "WMZL14";
+
+const uint16_t techemtype = 0x4322;
+const uint32_t wmzL14[] = {0x30585388, 0x30586050, 0x30586062, 0x30586064, 0x30586121, 0x30586125};
+long wmzValue[6];
+char wmzcnt = 6;
+char wmzvals = 0;
+const unsigned long wmz_cycle = 24 * 60 * 60 * 1000; //  1 day; the tricky part here ...we do not know which time it is, but next value come at midnight
+unsigned long next_wmz_run;
+const unsigned long wmz_wait = 15 * 60 * 1000; // we wait 15 min to catch all values
 
 char sendstr[100];
-unsigned long mytechemVal =0;
 
 void setup()
 {
@@ -103,6 +112,12 @@ void setup()
   {
     Serial.println("sx1276 ready");
   };
+
+  next_wmz_run = millis();
+  for (short i = 0; i < wmzcnt; i++)
+  {
+    wmzValue[i] = -1;
+  }
 }
 
 void checkcmd()
@@ -140,45 +155,82 @@ void checkcmd()
 
 void loop()
 {
-  
- byte idx =  check_RF_state(RxPin);
- if (idx >0 ) { 
-   // ToDo decouple it object driffen approach
-    OLED.clearLine(idx);
-    snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx-1],chHum[idx-1], diff / 1000);
-    OLED.drawString(0, idx, displaystr);
- }
- 
 
-  if (sx1276mbus.receiveSizedFrame(FixPktSize, 170)) //minRSSI to reduce noice load
+  byte idx = check_RF_state(RxPin);
+  if (idx > 0)
   {
-    byte RSSI = sx1276mbus.getLastRSSI();
-    if (RSSI < 250)
+    // ToDo decouple it object driffen approach
+    OLED.clearLine(idx);
+    snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx - 1], chHum[idx - 1], diff / 1000);
+    OLED.drawString(0, idx, displaystr);
+  }
+
+  if (millis() > next_wmz_run)
+  {                                                    // we run only once per period
+    if (sx1276mbus.receiveSizedFrame(FixPktSize, 200)) //minRSSI to reduce noice load
     {
-
-      printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI);
-      uint32_t myheatmeterserial = get_serial(mBusMsg);
-
-      if (0x30585388 == myheatmeterserial)
+      byte RSSI = sx1276mbus.getLastRSSI();
+      if (RSSI < 250)
       {
-        mytechemVal = get_current(mBusMsg);
-        char str[12];
-        sprintf(str, "%lu",mytechemVal );
-        OLED.drawString(10, 0, str);
+        memset(mBusMsg, 0, sizeof(mBusMsg));
+        //if (decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen) != DecErr)
+        decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen);
+        {
+          if (techemtype == get_type(mBusMsg))
+          {
+
+            printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI);
+
+            uint32_t heatmeterserial = get_serial(mBusMsg);
+
+            for (short i = 0; i < wmzcnt; i++)
+            {
+              if ((wmzL14[i] == heatmeterserial) && (wmzValue[i] == -1))
+              {
+                wmzValue[i] = get_current(mBusMsg);
+                wmzvals++;
+              }
+            }
+
+            if (0x30585388 == heatmeterserial)
+            {
+              char str[12];
+              sprintf(str, "%li", wmzValue[0]);
+              OLED.drawString(12, 0, str);
+            }
+
+          } //techemtype c
+        }   // decode ok
+      }     //RSSI
+    }       // packet received
+
+    if ((wmzvals == wmzcnt) || (millis() > (next_wmz_run + wmz_wait)))
+    {                            //timeout or we got all
+      next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
+      snprintf(sendstr, 99, "nodeid=%s&values=%li;%li;%li;%li;%li;%li", NODEID2,
+               wmzValue[0], wmzValue[1], wmzValue[2],
+               wmzValue[3], wmzValue[4], wmzValue[5]);
+      Serial.println(sendstr);
+      send2google(sendstr); // resend ToDo
+
+      wmzvals = 0;
+      for (short i = 0; i < wmzcnt; i++)
+      {
+        wmzValue[i] = -1;
       }
     }
-  }
+  } //next wmzrun
 
   checkcmd();
 
   if ((millis() > nextsend) && (rxstate == 0))
   //rxstate 0 is in the beginning, waitung for the first edge, ISR disabled
   {
-    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%lu", NODEID,
-            temp2str(0), chHum[0], temp2str(1), chHum[1], temp2str(2), chHum[2],
-            temp2str(3), chHum[3], temp2str(4), chHum[4], temp2str(5), chHum[5],
-            temp2str(6), chHum[6],
-            mytechemVal);
+    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%li", NODEID,
+             temp2str(0), chHum[0], temp2str(1), chHum[1], temp2str(2), chHum[2],
+             temp2str(3), chHum[3], temp2str(4), chHum[4], temp2str(5), chHum[5],
+             temp2str(6), chHum[6],
+             wmzValue[0]);
     Serial.println(sendstr);
     if (send2google(sendstr))
     {
@@ -192,14 +244,12 @@ void loop()
     Serial.println(ESP.getMinFreeHeap());
   }
 
-  /*
-  if ((millis() > nextdraw) ) //&& (rxstate == 0))
+  if ((millis() > nextdraw)) //&& (rxstate == 0))
   {
     unsigned long now1 = millis() / 1000UL;
-    snprintf(displaystr, 17, "%2luT %2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
-    OLED.drawString(0, 7, displaystr);
+    snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
+    OLED.drawString(0, 0, displaystr);
     nextdraw += 3000;
   }
-  */
 
 } // end of mainloop
