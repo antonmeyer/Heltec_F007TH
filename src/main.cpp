@@ -75,9 +75,9 @@ void setup()
 
   //esp_log_level_set("wifi", ESP_LOG_INFO);
   Serial.begin(115200);
-  Serial.println(getCpuFrequencyMhz());
+  //Serial.println(getCpuFrequencyMhz());
   Serial.println(NODEID);
-  Serial.println(ESP.getFreeHeap());
+  //Serial.println(ESP.getFreeHeap());
 
   //ToDo wrong place
   Wire.begin(4, 15); // remapping of SPI for OLED
@@ -173,13 +173,13 @@ void loop()
       if (RSSI < 250)
       {
         memset(mBusMsg, 0, sizeof(mBusMsg));
-        //if (decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen) != DecErr)
-        decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen);
-        {
+        if (decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen) != DecErr) {
+        //decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen);
+        printmsg(mBusMsg, sx1276mbus._RxBufferLen, RSSI);
+        
           if (techemtype == get_type(mBusMsg))
           {
-
-            printmsg(sx1276mbus._RxBuffer, sx1276mbus._RxBufferLen, RSSI);
+            //printmsg(mBusMsg, sx1276mbus._RxBufferLen, RSSI);
 
             uint32_t heatmeterserial = get_serial(mBusMsg);
 
@@ -187,7 +187,7 @@ void loop()
             {
               if ((wmzL14[i] == heatmeterserial) && (wmzValue[i] == -1))
               {
-                wmzValue[i] = get_current(mBusMsg);
+                wmzValue[i] = get_curWMZ(mBusMsg);
                 wmzvals++;
               }
             }
@@ -204,7 +204,7 @@ void loop()
       }     //RSSI
     }       // packet received
 
-    if ((wmzvals == wmzcnt) || (millis() > (next_wmz_run + wmz_wait)))
+    if ((wmzvals == wmzcnt +1) || (millis() > (next_wmz_run + wmz_wait*100)))
     {                            //timeout or we got all
       next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
       snprintf(sendstr, 99, "nodeid=%s&values=%li;%li;%li;%li;%li;%li", NODEID2,
