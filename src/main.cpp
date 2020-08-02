@@ -204,7 +204,7 @@ void loop()
       }     //RSSI
     }       // packet received
 
-    if ((wmzvals == wmzcnt +1) || (millis() > (next_wmz_run + wmz_wait*100)))
+    if ((wmzvals == wmzcnt ) || (millis() > (next_wmz_run + wmz_wait)))
     {                            //timeout or we got all
       next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
       snprintf(sendstr, 99, "nodeid=%s&values=%li;%li;%li;%li;%li;%li", NODEID2,
