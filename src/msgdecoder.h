@@ -1,0 +1,187 @@
+//just some encapsulations for value extracting
+//be careful: Byte ordering ntoh function include did not work
+
+#include <Arduino.h>
+#include "decoder3o6.h" //called from main
+#include "mbusmeters.h"
+
+mbusCalDate prevDate, curDate;
+
+unsigned char mBusMsg[64]; // holds the decoded message
+
+//uint8_t prevDay, prevMonth, prevYear, curDay, curMonth;
+
+
+static inline uint32_t get_serial(const uint8_t *const packet)
+{
+    //uint32_t serial;
+    //memcpy(&serial, &packet[4], sizeof(serial));
+    //return __builtin_bswap32(serial);
+    return (uint32_t) packet[4];
+}
+static inline uint16_t get_vendor(const uint8_t *const packet)
+{
+    uint16_t vendor;
+    memcpy(&vendor, &packet[2], sizeof(vendor));
+    return __builtin_bswap16(vendor);
+    //return vendor;
+}
+static inline uint16_t get_type(const uint8_t *const packet)
+{
+    //uint16_t * type = (uint16_t*) &packet[8];
+    return (uint16_t) packet[8];
+}
+static inline uint32_t get_prevWMZ(const uint8_t *const packet)
+{ //this value is the counter from tha last period
+    //uint32_t * prevwmz = (uint32_t *) &packet[16];
+    return (uint32_t ) (packet[16] &0x00FFFFFF); //only 3 bytes
+}
+static inline uint32_t get_curWMZ(const uint8_t *const packet)
+{ //this is the diff since the last period
+   // uint32_t curent;
+    //curent = 0;
+    //memcpy(&curent, &packet[20], 3);
+    //uint32_t * curwmz = (uint32_t *) &packet[20];
+    return (uint32_t ) (packet[20] &0x00FFFFFF); //only 3 bytes
+}
+static inline float get_temp1(const uint8_t *const packet)
+{
+    uint16_t * temp1 = (uint16_t*) &packet[22];
+    return (float)((float)*temp1) / 100;   
+}
+static inline float get_temp2(const uint8_t *const packet)
+{
+    //uint16_t temp2;
+    //memcpy(&temp2, &packet[24], sizeof(temp2));
+    uint16_t * temp2 = (uint16_t*) &packet[24];
+    return (float)((float)*temp2) / 100;
+}
+
+static inline uint16_t get_prevWZ(const uint8_t *const packet)
+{
+    //uint16_t prevWZ;
+    //memcpy(&prevWZ, &packet[16], sizeof(prevWZ));
+    //uint16_t * prevWZ = (uint16_t*) &packet[16];
+    return (uint16_t) packet[16];
+}
+
+static inline uint16_t get_curWZ(const uint8_t *const packet)
+{
+    //uint16_t curWZ;
+    //memcpy(&curWZ, &packet[20], sizeof(curWZ));
+    //uint16_t * curWZ = (uint16_t*) &packet[20];
+    return (uint16_t) packet[20];
+}
+
+static inline void get_prevDate (const uint8_t *const packet)
+{   uint16_t * tmp = (uint16_t*) &packet[14];
+    prevDate.day = *tmp & 0x1F;
+    prevDate.month = (*tmp >>5) & 0x000F;
+    prevDate.year = (*tmp >>9) & 0x003F;
+}
+
+static inline void get_CurDate_WMZ (const uint8_t *const packet)
+{
+   uint16_t * tmp = (uint16_t*) &packet[23];
+    curDate.day = (*tmp >>7) & 0x001F;
+    curDate.month = (packet[19] >>3) & 0x000F;
+}
+
+static inline void get_CurDate_WZ (const uint8_t *const packet)
+{
+    uint16_t * tmp = (uint16_t*) &packet[18];
+    curDate.day = *tmp >>4  & 0x1F;
+    curDate.month = ( *tmp >>9) & 0x0F;
+}
+
+
+void printmsg(unsigned char mBusMsg[], unsigned char RxBufferlen, byte rx_rssi)
+{
+    //unsigned char RSSI = rfm69.getLastRSSI();
+    {
+//#define debug_decoder
+#ifdef debug_decoder
+        Serial.print("mbmsg: ");
+        //for (i = 0; i < mBusMsg[0] + 1; i++)
+        for (uint8_t i = 0; i < RxBufferlen * 2 / 3; i++)
+        {
+            char tempstr[3];
+            sprintf(tempstr, "%02X", mBusMsg[i]);
+            Serial.print(tempstr);
+        }
+        Serial.print(":");
+        Serial.print((RxBufferlen * 2 / 3), HEX);
+
+        Serial.print(":");
+        Serial.println(rx_rssi / -2.0);
+#endif
+        uint16_t mtype = get_type(mBusMsg);
+        uint16_t vendor = get_vendor(mBusMsg);
+        Serial.print("msgdec: ");
+        Serial.print(rx_rssi / -2.0);
+        Serial.print(":");
+        Serial.print(vendor, HEX);
+        Serial.print(";");
+        Serial.print(get_serial(mBusMsg), HEX);
+        Serial.print(";");
+        Serial.print(mtype, HEX);
+        Serial.print(";");
+
+        if (vendor == 0x6850) { //techem
+            get_prevDate(mBusMsg);
+            
+            /*Serial.print(prevDay);
+            Serial.print(".");
+            Serial.print(prevMonth);
+            Serial.print(".");
+            Serial.print(prevYear);
+            */
+           Serial.print(mbusCalDate_getString(prevDate));
+            Serial.print(";");
+        }
+
+        if (mtype == 0x4322) {
+            get_CurDate_WMZ(mBusMsg);
+            Serial.print(curDate.day);
+            Serial.print(".");
+            Serial.print(curDate.month);
+            Serial.print(";");
+        }
+        
+        if ((mtype == 0x6274) || (mtype == 0x6171) || (mtype == 0x8069)) {
+            get_CurDate_WZ(mBusMsg);
+            Serial.print(curDate.day);
+            Serial.print(".");
+            Serial.print(curDate.day);
+            Serial.print(";");
+        }
+        if (mtype == 0x8069)
+        {
+            Serial.print(get_temp1(mBusMsg));
+            Serial.print(";");
+            Serial.print(get_temp2(mBusMsg));
+            Serial.print(";");
+            Serial.print(get_prevWZ(mBusMsg));
+            Serial.print(";");
+            Serial.println(get_curWZ(mBusMsg));
+        }
+        else if ((mtype & 0xFF00) == 0x4300)
+        {
+            Serial.print(get_prevWMZ(mBusMsg));
+            Serial.print(";");
+            Serial.println(get_curWMZ(mBusMsg));
+        }
+        else if (((mtype & 0xFF00) == 0x6200) || ((mtype & 0xFF00) == 0x6100))
+        {
+            Serial.print(get_prevWZ(mBusMsg));
+            Serial.print(";");
+            Serial.println(get_curWZ(mBusMsg));
+        }
+
+        else
+        {
+            Serial.println();
+        };
+    //else Serial.print(rx_rssi / -2.0);
+}
+}

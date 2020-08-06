@@ -13,7 +13,7 @@
 
 //#include "RFM69mbus.h"
 #include "sx1276mbus.h"
-SX1276MBUS sx1276mbus;
+SX1276MBUS sx12xxmbus;
 
 #define RxPin 38 //ESP32 input only
 //#define RxPin 19
@@ -104,7 +104,7 @@ void setup()
   nextsend = millis(); //update asap
 
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
-  if (!sx1276mbus.initDevice(PinNSS, PinDIO0)) //minRSSI
+  if (!sx12xxmbus.initDevice(PinNSS, PinDIO0)) //minRSSI
   {
     Serial.println("error initializing sx1276");
   }
@@ -114,6 +114,7 @@ void setup()
   };
 
   next_wmz_run = millis();
+
   for (short i = 0; i < wmzcnt; i++)
   {
     wmzValue[i] = -1;
@@ -135,21 +136,21 @@ void checkcmd()
 
     if (cmd == 'w')
     {
-      sx1276mbus.setModeStdby();
+      sx12xxmbus.setModeStdby();
       regval = strtoul(cmdstr.substring(4, 6).c_str(), &ptr, 16);
-      sx1276mbus.writeSPI(reg, regval);
+      sx12xxmbus.writeSPI(reg, regval);
       Serial.print("set ");
       Serial.print(reg, HEX);
       Serial.print(" to ");
+      Serial.println(regval, HEX);
     }
-    if (cmd == 'r')
+    else if (cmd == 'r')
     {
-      regval = sx1276mbus.readSPI(reg);
+      regval = sx12xxmbus.readSPI(reg);
       Serial.print(reg, HEX);
       Serial.print(" is: ");
-    }
-
-    Serial.println(regval, HEX);
+      Serial.println(regval, HEX);
+    } 
   }
 }
 
@@ -167,15 +168,15 @@ void loop()
 
   if (millis() > next_wmz_run)
   {                                                    // we run only once per period
-    if (sx1276mbus.receiveSizedFrame(FixPktSize, 200)) //minRSSI to reduce noice load
+    if (sx12xxmbus.receiveSizedFrame(FixPktSize, 200)) //minRSSI to reduce noice load
     {
-      byte RSSI = sx1276mbus.getLastRSSI();
+      byte RSSI = sx12xxmbus.getLastRSSI();
       if (RSSI < 250)
       {
         memset(mBusMsg, 0, sizeof(mBusMsg));
-        if (decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen) != DecErr) {
+        if (decode3o6Block(sx12xxmbus._RxBuffer, mBusMsg, sx12xxmbus._RxBufferLen) != DecErr) {
         //decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen);
-        printmsg(mBusMsg, sx1276mbus._RxBufferLen, RSSI);
+        printmsg(mBusMsg, sx12xxmbus._RxBufferLen, RSSI);
         
           if (techemtype == get_type(mBusMsg))
           {
@@ -183,6 +184,7 @@ void loop()
 
             uint32_t heatmeterserial = get_serial(mBusMsg);
 
+            //find the entry in the array
             for (short i = 0; i < wmzcnt; i++)
             {
               if ((wmzL14[i] == heatmeterserial) && (wmzValue[i] == -1))
@@ -212,7 +214,7 @@ void loop()
                wmzValue[3], wmzValue[4], wmzValue[5]);
       Serial.println(sendstr);
       send2google(sendstr); // resend ToDo
-
+      //init for the next run
       wmzvals = 0;
       for (short i = 0; i < wmzcnt; i++)
       {
