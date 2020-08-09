@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include "decoder3o6.h" //called from main
-#include "mbusmeters.h"
+//#include "mbusmeters.h"
 
 mbusCalDate prevDate, curDate;
 
@@ -46,15 +46,15 @@ static inline uint32_t get_curWMZ(const uint8_t *const packet)
 }
 static inline float get_temp1(const uint8_t *const packet)
 {
-    uint16_t * temp1 = (uint16_t*) &packet[22];
-    return (float)((float)*temp1) / 100;   
+    uint16_t temp1 = * ((uint16_t*) &packet[22]);
+    return (float)((float)temp1) / 100;   
 }
 static inline float get_temp2(const uint8_t *const packet)
 {
     //uint16_t temp2;
     //memcpy(&temp2, &packet[24], sizeof(temp2));
-    uint16_t * temp2 = (uint16_t*) &packet[24];
-    return (float)((float)*temp2) / 100;
+    uint16_t temp2 = *((uint16_t*) &packet[24]);
+    return (float)((float)temp2) / 100;
 }
 
 static inline uint16_t get_prevWZ(const uint8_t *const packet)
@@ -74,24 +74,26 @@ static inline uint16_t get_curWZ(const uint8_t *const packet)
 }
 
 static inline void get_prevDate (const uint8_t *const packet)
-{   uint16_t * tmp = (uint16_t*) &packet[14];
-    prevDate.day = *tmp & 0x1F;
-    prevDate.month = (*tmp >>5) & 0x000F;
-    prevDate.year = (*tmp >>9) & 0x003F;
+{   uint16_t tmp = *((uint16_t *) &packet[14]);
+    prevDate.day = tmp & 0x1F;
+    //prevDate.day = packet[14] & 0x1F;
+    prevDate.month = (tmp >>5) & 0x000F;
+    prevDate.year = (tmp >>9) & 0x003F;
+    // prevDate.year = (packet[15] >>1) & 0x003F;
 }
 
 static inline void get_CurDate_WMZ (const uint8_t *const packet)
 {
-   uint16_t * tmp = (uint16_t*) &packet[23];
-    curDate.day = (*tmp >>7) & 0x001F;
+   uint16_t tmp = *((uint16_t*) &packet[23]);
+    curDate.day = (tmp >>7) & 0x001F;
     curDate.month = (packet[19] >>3) & 0x000F;
 }
 
 static inline void get_CurDate_WZ (const uint8_t *const packet)
 {
-    uint16_t * tmp = (uint16_t*) &packet[18];
-    curDate.day = *tmp >>4  & 0x1F;
-    curDate.month = ( *tmp >>9) & 0x0F;
+    uint16_t tmp = *((uint16_t*) &packet[18]);
+    curDate.day = tmp >>4  & 0x1F;
+    curDate.month = ( tmp >>9) & 0x0F;
 }
 
 

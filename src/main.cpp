@@ -43,7 +43,8 @@ U8X8_SSD1306_128X64_NONAME_HW_I2C OLED(/*OLED_RST*/ 16, /*OLED_SCL*/ 15, /*OLED_
 //U8X8_SH1106_128X64_NONAME_HW_I2C OLED(/* reset=*/U8X8_PIN_NONE);
 char displaystr[20];
 
-#include "msgdecoder.h"
+#include "mbusmeters.h"
+wMBusMsg wmbMsg1;
 
 unsigned long nextsend;
 const unsigned long period = 300000; //period to send to google spreadsheet
@@ -53,7 +54,7 @@ unsigned int nextdraw = 0;
 const char *NODEID = "F007TH"; // names the spreadsheet
 const char *NODEID2 = "WMZL14";
 
-const uint16_t techemtype = 0x4322;
+const uint16_t techemWMZ = 0x43;
 const uint32_t wmzL14[] = {0x30585388, 0x30586050, 0x30586062, 0x30586064, 0x30586121, 0x30586125};
 long wmzValue[6];
 char wmzcnt = 6;
@@ -150,14 +151,15 @@ void checkcmd()
       Serial.print(reg, HEX);
       Serial.print(" is: ");
       Serial.println(regval, HEX);
-    } 
+    }
   }
 }
 
 void loop()
 {
 
-  byte idx = check_RF_state(RxPin);
+  //byte idx = check_RF_state(RxPin);
+  byte idx =0;
   if (idx > 0)
   {
     // ToDo decouple it object driffen approach
@@ -173,23 +175,25 @@ void loop()
       byte RSSI = sx12xxmbus.getLastRSSI();
       if (RSSI < 250)
       {
-        memset(mBusMsg, 0, sizeof(mBusMsg));
-        if (decode3o6Block(sx12xxmbus._RxBuffer, mBusMsg, sx12xxmbus._RxBufferLen) != DecErr) {
-        //decode3o6Block(sx1276mbus._RxBuffer, mBusMsg, sx1276mbus._RxBufferLen);
-        printmsg(mBusMsg, sx12xxmbus._RxBufferLen, RSSI);
-        
-          if (techemtype == get_type(mBusMsg))
+        //memset(mBusMsg, 0, sizeof(mBusMsg));
+        //if (decode3o6Block(sx12xxmbus._RxBuffer, mBusMsg, sx12xxmbus._RxBufferLen) != DecErr) {
+        wmbMsg1.parseraw(sx12xxmbus._RxBuffer, sx12xxmbus._RxBufferLen);
+        {
+
+          wmbMsg1.printmsg();
+
+          if (techemWMZ == wmbMsg1.get_mtype())
           {
             //printmsg(mBusMsg, sx1276mbus._RxBufferLen, RSSI);
 
-            uint32_t heatmeterserial = get_serial(mBusMsg);
+            uint32_t heatmeterserial = wmbMsg1.get_serial();
 
             //find the entry in the array
             for (short i = 0; i < wmzcnt; i++)
             {
               if ((wmzL14[i] == heatmeterserial) && (wmzValue[i] == -1))
               {
-                wmzValue[i] = get_curWMZ(mBusMsg);
+                wmzValue[i] = wmbMsg1.get_curWMZ();
                 wmzvals++;
               }
             }
@@ -206,14 +210,14 @@ void loop()
       }     //RSSI
     }       // packet received
 
-    if ((wmzvals == wmzcnt ) || (millis() > (next_wmz_run + wmz_wait)))
+    if ((wmzvals == wmzcnt +1) || (millis() > (next_wmz_run + wmz_wait*100)))
     {                            //timeout or we got all
       next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
       snprintf(sendstr, 99, "nodeid=%s&values=%li;%li;%li;%li;%li;%li", NODEID2,
                wmzValue[0], wmzValue[1], wmzValue[2],
                wmzValue[3], wmzValue[4], wmzValue[5]);
       Serial.println(sendstr);
-      send2google(sendstr); // resend ToDo
+      //send2google(sendstr); // resend ToDo
       //init for the next run
       wmzvals = 0;
       for (short i = 0; i < wmzcnt; i++)
@@ -234,7 +238,8 @@ void loop()
              temp2str(6), chHum[6],
              wmzValue[0]);
     Serial.println(sendstr);
-    if (send2google(sendstr))
+    //if (send2google(sendstr))
+    if (1) 
     {
       nextsend += period; //send ok, next period
     }
