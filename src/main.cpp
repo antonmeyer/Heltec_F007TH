@@ -54,11 +54,18 @@ unsigned int nextdraw = 0;
 const char *NODEID = "F007TH"; // names the spreadsheet
 const char *NODEID2 = "WMZL14";
 
-const uint16_t techemWMZ = 0x43;
+#define tWMZ 0x43
+#define tWWZ 0x62
+#define techemvendor 0x6850
+
 const uint32_t wmzL14[] = {0x30585388, 0x30586050, 0x30586062, 0x30586064, 0x30586121, 0x30586125};
-long wmzValue[6];
-char wmzcnt = 6;
-char wmzvals = 0;
+const uint32_t wwzL14[] = {0x25063431, 0x25071898, 25071981, 0x25153680, 0x25153687, 0x25153718};
+#define SIZEA(a) (sizeof a / sizeof *a)
+
+mbMeterGrp wmzL14g(techemvendor, tWMZ, (uint32_t *)wmzL14, SIZEA(wmzL14));
+mbMeterGrp wwzL14g(techemvendor, tWWZ, (uint32_t *)wwzL14, SIZEA(wwzL14));
+#define MYWWZ 0x25153718
+
 const unsigned long wmz_cycle = 24 * 60 * 60 * 1000; //  1 day; the tricky part here ...we do not know which time it is, but next value come at midnight
 unsigned long next_wmz_run;
 const unsigned long wmz_wait = 15 * 60 * 1000; // we wait 15 min to catch all values
@@ -115,11 +122,6 @@ void setup()
   };
 
   next_wmz_run = millis();
-
-  for (short i = 0; i < wmzcnt; i++)
-  {
-    wmzValue[i] = -1;
-  }
 }
 
 void checkcmd()
@@ -158,8 +160,10 @@ void checkcmd()
 void loop()
 {
 
-  //byte idx = check_RF_state(RxPin);
-  byte idx =0;
+  //Serial.println(grpwmzL14.vendor);
+
+  byte idx = check_RF_state(RxPin);
+  //byte idx =0;
   if (idx > 0)
   {
     // ToDo decouple it object driffen approach
@@ -173,57 +177,37 @@ void loop()
     if (sx12xxmbus.receiveSizedFrame(FixPktSize, 200)) //minRSSI to reduce noice load
     {
       byte RSSI = sx12xxmbus.getLastRSSI();
-      if (RSSI < 250)
+      if ((RSSI < 250) && wmbMsg1.parseraw(sx12xxmbus._RxBuffer, sx12xxmbus._RxBufferLen))
       {
-        //memset(mBusMsg, 0, sizeof(mBusMsg));
         //if (decode3o6Block(sx12xxmbus._RxBuffer, mBusMsg, sx12xxmbus._RxBufferLen) != DecErr) {
-        wmbMsg1.parseraw(sx12xxmbus._RxBuffer, sx12xxmbus._RxBufferLen);
-        {
+        wmbMsg1.printmsg();
+        if (!wwzL14g.matchgrp(wmbMsg1)) //we assume 1 msg can belong only to 1 group
+          wmzL14g.matchgrp(wmbMsg1);
 
-          wmbMsg1.printmsg();
-
-          if (techemWMZ == wmbMsg1.get_mtype())
-          {
-            //printmsg(mBusMsg, sx1276mbus._RxBufferLen, RSSI);
-
-            uint32_t heatmeterserial = wmbMsg1.get_serial();
-
-            //find the entry in the array
-            for (short i = 0; i < wmzcnt; i++)
-            {
-              if ((wmzL14[i] == heatmeterserial) && (wmzValue[i] == -1))
-              {
-                wmzValue[i] = wmbMsg1.get_curWMZ();
-                wmzvals++;
-              }
-            }
-
+        /*
             if (0x30585388 == heatmeterserial)
             {
               char str[12];
               sprintf(str, "%li", wmzValue[0]);
               OLED.drawString(12, 0, str);
-            }
+            } */
 
-          } //techemtype c
-        }   // decode ok
-      }     //RSSI
-    }       // packet received
+      } //RSSI
+    }   // packet received
 
-    if ((wmzvals == wmzcnt +1) || (millis() > (next_wmz_run + wmz_wait*100)))
+    if ((wmzL14g.complete() && wwzL14g.complete()) || (millis() > (next_wmz_run + wmz_wait)))
     {                            //timeout or we got all
-      next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
-      snprintf(sendstr, 99, "nodeid=%s&values=%li;%li;%li;%li;%li;%li", NODEID2,
-               wmzValue[0], wmzValue[1], wmzValue[2],
-               wmzValue[3], wmzValue[4], wmzValue[5]);
+      next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run NODEID2
+
+      wmzL14g.fillsendstr(NODEID2, sendstr, 100);
       Serial.println(sendstr);
-      //send2google(sendstr); // resend ToDo
+      send2google(sendstr); // resend ToDo
       //init for the next run
-      wmzvals = 0;
-      for (short i = 0; i < wmzcnt; i++)
-      {
-        wmzValue[i] = -1;
-      }
+      wmzL14g.clearvals();
+      wwzL14g.fillsendstr("WWL14", sendstr, 100);
+      Serial.println(sendstr);
+      send2google(sendstr);
+      wwzL14g.clearvals();
     }
   } //next wmzrun
 
@@ -232,14 +216,13 @@ void loop()
   if ((millis() > nextsend) && (rxstate == 0))
   //rxstate 0 is in the beginning, waitung for the first edge, ISR disabled
   {
-    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%li", NODEID,
+    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d", NODEID,
              temp2str(0), chHum[0], temp2str(1), chHum[1], temp2str(2), chHum[2],
              temp2str(3), chHum[3], temp2str(4), chHum[4], temp2str(5), chHum[5],
-             temp2str(6), chHum[6],
-             wmzValue[0]);
+             temp2str(6), chHum[6]);
     Serial.println(sendstr);
-    //if (send2google(sendstr))
-    if (1) 
+    if (send2google(sendstr))
+    //if (1)
     {
       nextsend += period; //send ok, next period
     }
@@ -248,11 +231,11 @@ void loop()
       nextsend += 30000; // send nok retry 30s later
     }
 
-    Serial.println(ESP.getMinFreeHeap());
+    //Serial.println(ESP.getMinFreeHeap());
   }
 
   if ((millis() > nextdraw)) //&& (rxstate == 0))
-  {
+  {                          //update the timer on the OLED
     unsigned long now1 = millis() / 1000UL;
     snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
     OLED.drawString(0, 0, displaystr);
