@@ -122,10 +122,6 @@ void SX1276MBUS::setBitRate( uint32_t bitrate ) {
     writeSPI( REG_BITRATELSB, ( uint8_t )( bitrateval & 0xFF ) );
 }
 
-
-
-           
-
 void SX1276MBUS::setSyncWords(unsigned char *SyncWords, unsigned char Len)
 {
     unsigned char SyncConfig;

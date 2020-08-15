@@ -72,6 +72,8 @@ const unsigned long wmz_wait = 15 * 60 * 1000; // we wait 15 min to catch all va
 
 char sendstr[100];
 
+#include "prgbtn.h"
+
 void setup()
 {
   //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
@@ -80,7 +82,6 @@ void setup()
   //Heltec.begin(false /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/);
 
   //Heltec.display->display();
-
   //esp_log_level_set("wifi", ESP_LOG_INFO);
   Serial.begin(115200);
   //Serial.println(getCpuFrequencyMhz());
@@ -90,10 +91,10 @@ void setup()
   //ToDo wrong place
   Wire.begin(4, 15); // remapping of SPI for OLED
   //Wire.setClock(700000);
-
   OLED.begin();
   OLED.setFont(u8x8_font_chroma48medium8_r);
   OLED.drawString(0, 0, "F0007TH");
+  //OLED.setPowerSave(1); //should switch off the OLED
 
   //Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/, false /*PABOOST Enable*/, 868E6 /**/);
   //Heltec.display->flipScreenVertically();
@@ -107,10 +108,10 @@ void setup()
   // ISR seems to crash WLAN/IP stack
   // ToDo disable ISR during reconnect
   WiFiinit();
-
   RFinit(RxPin);
-  nextsend = millis(); //update asap
 
+  nextsend = millis(); //update asap
+Serial.println("RFinit");
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
   if (!sx12xxmbus.initDevice(PinNSS, PinDIO0)) //minRSSI
   {
@@ -122,6 +123,8 @@ void setup()
   };
 
   next_wmz_run = millis();
+
+  button_init();
 }
 
 void checkcmd()
@@ -163,6 +166,7 @@ void loop()
   //Serial.println(grpwmzL14.vendor);
 
   byte idx = check_RF_state(RxPin);
+
   //byte idx =0;
   if (idx > 0)
   {
@@ -236,10 +240,12 @@ void loop()
 
   if ((millis() > nextdraw)) //&& (rxstate == 0))
   {                          //update the timer on the OLED
+
     unsigned long now1 = millis() / 1000UL;
     snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
     OLED.drawString(0, 0, displaystr);
     nextdraw += 3000;
+    OLED.setPowerSave(OLEDoff); //ToDo encapsulate, wenn off no write to OLED, and call only when changed
   }
 
 } // end of mainloop

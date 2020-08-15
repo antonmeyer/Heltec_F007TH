@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "decoder3o6.h"
-#include <array>
+#include <endian.h> 
 
 #ifndef MBUSMETERS
 #define MBUSMETERS
@@ -76,11 +76,11 @@ public:
     };
     inline uint32_t get_serial()
     {
-        return *((uint32_t *)&mbmsg[4]);
+        return le32toh(*(uint32_t *)&mbmsg[4]);
     }
     inline uint16_t get_vendor()
     {
-        return __builtin_bswap16(*((uint16_t *)&mbmsg[2]));
+        return be16toh(*((uint16_t *)&mbmsg[2]));
         //return __builtin_bswap16(vendor);
         //return vendor;
     }
@@ -95,38 +95,36 @@ public:
     inline uint32_t get_prevVal()
     { //this value is the counter from tha last bill period
         if (mtype == 0x43)
-            return (*(uint32_t *)&mbmsg[16]) & 0x00FFFFFF; //only 3 bytes
+            return le32toh(*(uint32_t *)&mbmsg[16]) & 0x00FFFFFF; //only 3 bytes
         if ((mtype == 0x62) || (mtype == 0x61) || (mtype == 0x80))
-            return *(uint16_t *)&mbmsg[16];
+            return le16toh(*(uint16_t *)&mbmsg[16]);
+    return 0;
     }
     inline uint32_t get_curVal()
     { //this is the diff since the last period
         if (mtype == 0x43)
-            return (*(uint32_t *)&mbmsg[20]) & 0x00FFFFFF; //only 3 bytes
+            return le32toh(*(uint32_t *)&mbmsg[20]) & 0x00FFFFFF; //only 3 bytes
         if ((mtype == 0x62) || (mtype == 0x61) || (mtype == 0x80))
-            return *(uint16_t *)&mbmsg[20];
+            return le16toh(*(uint16_t *)&mbmsg[20]);
+        return 0;
     }
 
     inline float get_temp1()
     {
-        uint16_t temp1 = *((uint16_t *)&mbmsg[22]);
+        uint16_t temp1 = le16toh(*((uint16_t *)&mbmsg[22]));
         return (float)((float)temp1) / 100;
     }
     inline float get_temp2()
     {
-        uint16_t temp2 = *((uint16_t *)&mbmsg[24]);
+        uint16_t temp2 = le16toh(*((uint16_t *)&mbmsg[24]));
         return (float)((float)temp2) / 100;
-    }
-
-    inline uint16_t get_prevDate()
-    {
-        return *(uint16_t *)&mbmsg[14];
     }
 
     inline void get_calDates()
     {
         //first we get the prev Date as it has a year
-        prevDate.date = *(uint16_t *)&mbmsg[14];
+        prevDate.date = (*(uint16_t *)&mbmsg[14]);
+
         // now get the current Date, which is much more tricky
         mtype = get_mtype(); //diffrerent types have different message formats
         if (mtype == 0x43)   //WMZ
