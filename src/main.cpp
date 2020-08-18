@@ -162,13 +162,11 @@ void checkcmd()
 
 void loop()
 {
-
   //Serial.println(grpwmzL14.vendor);
-
   byte idx = check_RF_state(RxPin);
 
   //byte idx =0;
-  if (idx > 0)
+  if ((idx > 0) && !OLEDoff)
   {
     // ToDo decouple it object driffen approach
     OLED.clearLine(idx);
@@ -201,6 +199,7 @@ void loop()
 
     if ((wmzL14g.complete() && wwzL14g.complete()) || (millis() > (next_wmz_run + wmz_wait)))
     {                            //timeout or we got all
+      sx12xxmbus.setModeSleep(); //sx12xx will sleep until next period
       next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run NODEID2
 
       wmzL14g.fillsendstr(NODEID2, sendstr, 100);
@@ -241,9 +240,11 @@ void loop()
   if ((millis() > nextdraw)) //&& (rxstate == 0))
   {                          //update the timer on the OLED
 
+    if (!OLEDoff) {
     unsigned long now1 = millis() / 1000UL;
     snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
     OLED.drawString(0, 0, displaystr);
+    }
     nextdraw += 3000;
     OLED.setPowerSave(OLEDoff); //ToDo encapsulate, wenn off no write to OLED, and call only when changed
   }

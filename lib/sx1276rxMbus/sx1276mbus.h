@@ -51,6 +51,7 @@ public:
 	float convertRSSIToRSSIdBm(unsigned char RSSI);
 	int readTemperature();
 	void setCalibrationTemp(unsigned char Val);
+	void setModeSleep();
 	void setModeStdby();
 	void setModeRx();
 	//unsigned char _RxBuffer[RFM69_MAX_MESSAGE_LEN];

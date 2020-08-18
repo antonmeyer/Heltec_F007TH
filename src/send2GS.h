@@ -2,6 +2,12 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include "credentials.h"
+
+#include <esp_pm.h>
+#include <esp_wifi.h>
+#include <esp_wifi_types.h>
+
+
 //#define debug false
 
 
@@ -24,6 +30,7 @@ void WiFiinit()
   Serial.println(WiFi.localIP());
 
   //WiFi.setTxPower(WIFI_POWER_7dBm);
+esp_wifi_set_ps(WIFI_PS_MAX_MODEM);
 
   
 }

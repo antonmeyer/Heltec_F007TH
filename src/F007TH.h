@@ -20,7 +20,7 @@ byte nosBits = 6;  // Counts to 8 bits within a dataByte
 byte nosBytes = 0; // Counter stays within 0 -> maxBytes
 // Variables for multiple packets
 
-byte manchester[7]; // Array to store 7 bytes of manchester pattern decoded on the fly
+byte dataarray[7]; // Array to store 7 bytes of manchester pattern decoded on the fly
 
 // Variables to prepare recorded values for Ambient
 
@@ -73,7 +73,7 @@ byte add(byte bitData)
   if (nosBits == 8)
   {
     nosBits = 0;
-    manchester[nosBytes] = dataByte;
+    dataarray[nosBytes] = dataByte;
     nosBytes++;
   }
   if (nosBytes == maxBytes)
@@ -95,15 +95,15 @@ byte add(byte bitData)
 */
 
     // Checks sensor is a F007th with a valid humidity reading equal or less than 100
-    if (manchester[1] == 0x45 && (Checksum(5, &manchester[1]) == manchester[6]))
+    if (dataarray[1] == 0x45 && (Checksum(5, &dataarray[1]) == dataarray[6]))
     {
       // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
-      byte stnId = (manchester[3] & B01110000) >> 4;
+      byte stnId = (dataarray[3] & B01110000) >> 4;
 
       if (stnId >= 0 && stnId <= 7) //to be save
       {
-        chTemp[stnId] = ((manchester[3] & B00000111) << 8) + manchester[4];
-        chHum[stnId] = manchester[5];
+        chTemp[stnId] = ((dataarray[3] & B00000111) << 8) + dataarray[4];
+        chHum[stnId] = dataarray[5];
 
         unsigned long now = millis();
         diff = now - chLastRecv[stnId];
@@ -123,7 +123,7 @@ void eraseManchester()
 {
   for (byte j = 0; j < maxBytes; j++)
   {
-    manchester[j] = j;
+    dataarray[j] = j;
   }
 }
 

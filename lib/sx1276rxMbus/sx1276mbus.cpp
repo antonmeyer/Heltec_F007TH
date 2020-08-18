@@ -1,6 +1,6 @@
 #include "sx1276mbus.h"
 #include <SPI.h>
-#include "decoder3o6.h"
+//#include "decoder3o6.h"
 
 boolean SX1276MBUS::initDevice(unsigned char PinNSS, unsigned char PinDIO0)
 {
@@ -165,6 +165,16 @@ void SX1276MBUS::setModeStdby()
     }
 }
 
+void SX1276MBUS::setModeSleep()
+{
+    if (_Mode != SLEEP)
+    {
+        //set OP mode, reading for mode rdy did not work
+        writeSPI( REG_OPMODE, ( readSPI( REG_OPMODE ) & RF_OPMODE_MASK ) | RF_OPMODE_SLEEP );
+        _Mode = SLEEP;
+    }
+}
+
 void SX1276MBUS::setModeRx()
 {
     if (_Mode != sx1276RX)
@@ -179,10 +189,15 @@ void SX1276MBUS::setModeRx()
 void SX1276MBUS::setOpMode(unsigned char opMode)
 {
     writeSPI( REG_OPMODE, ( readSPI( REG_OPMODE ) & RF_OPMODE_MASK ) | opMode );
-
+//uint32_t start = micros();
+//ToDo it took some 160 ..270 us to change the state; do we realy need to wait here?
     while (!(readSPI(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY))
-        ; //wWait for mode to change.
+   ; //wWait for mode to change.
+//uint32_t stop = micros()-start;
+    //Serial.print("us sx12xx change opMode: ");
+   // Serial.println(stop);
 }
+        
 
 void SX1276MBUS::readFifo(unsigned char *buffer, unsigned char length)
 {
