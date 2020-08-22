@@ -1,6 +1,7 @@
 #include <Arduino.h>
 //#include <heltec.h>
 #include "F007TH.h"
+#include "F007TH_RMT.h"
 #include "send2GS.h"
 #include <U8x8lib.h>
 
@@ -17,6 +18,7 @@ SX1276MBUS sx12xxmbus;
 
 #define RxPin 38 //ESP32 input only
 //#define RxPin 19
+F007TH_RMT rf007th(RxPin);
 
 #define PinNSS 18 //for sx1276 on Heltec v2
 //#define PinNSS 2
