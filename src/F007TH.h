@@ -89,13 +89,13 @@ byte add(byte bitData)
       Serial.print(manchester[j], HEX);
     }
     Serial.print(":");
-    Serial.println(Checksum(5, &manchester[1]),HEX);
+    Serial.println(Chksum(5, &manchester[1]),HEX);
     //Serial.println((lfsr_digest8(&manchester[1], 5, 0x98, 0x3e) ^ 0x64), HEX);
    //Serial.println();
 */
 
     // Checks sensor is a F007th with a valid humidity reading equal or less than 100
-    if (dataarray[1] == 0x45 && (Checksum(5, &dataarray[1]) == dataarray[6]))
+    if (dataarray[1] == 0x45 && (Chksum(5, &dataarray[1]) == dataarray[6]))
     {
       // Gets raw temperature from bytes 3 and 4 (note this is neither C or F but a value from the sensor)
       byte stnId = (dataarray[3] & B01110000) >> 4;

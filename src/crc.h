@@ -1,4 +1,4 @@
-uint8_t Checksum(int length, uint8_t *buff)
+uint8_t Chksum(int length, uint8_t *buff)
 {
     uint8_t mask = 0x7C;
     uint8_t checksum = 0x64;
