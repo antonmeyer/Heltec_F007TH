@@ -1,6 +1,7 @@
 #include <Arduino.h>
+#include <Wire.h>
 //#include <heltec.h>
-#include "F007TH.h"
+//#include "F007TH.h"
 #include "F007TH_RMT.h"
 #include "send2GS.h"
 #include <U8x8lib.h>
@@ -18,7 +19,7 @@ SX1276MBUS sx12xxmbus;
 
 #define RxPin 38 //ESP32 input only
 //#define RxPin 19
-//F007TH_RMT rf007th(RxPin);
+F007TH_RMT *f007th = new F007TH_RMT(RxPin, 7); // max 7 sensors
 
 #define PinNSS 18 //for sx1276 on Heltec v2
 //#define PinNSS 2
@@ -96,24 +97,15 @@ void setup()
   OLED.begin();
   OLED.setFont(u8x8_font_chroma48medium8_r);
   OLED.drawString(0, 0, "F0007TH");
-  //OLED.setPowerSave(1); //should switch off the OLED
-
-  //Heltec.begin(true /*DisplayEnable Enable*/, false /*LoRa Disable*/, true /*Serial Enable*/, false /*PABOOST Enable*/, 868E6 /**/);
-  //Heltec.display->flipScreenVertically();
-  //Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
-  //Heltec.display->setFont(ArialMT_Plain_10);
-
-  //Heltec.display->drawString(0, 0, "Hello world");
-  //Heltec.display->display();
 
   // seems to be important to start that first
   // ISR seems to crash WLAN/IP stack
   // ToDo disable ISR during reconnect
   WiFiinit();
-  RFinit(RxPin);
-
-  nextsend = millis(); //update asap
-Serial.println("RFinit");
+  //RFinit(RxPin);
+  
+  nextsend = millis() + period; //update asap
+  Serial.println("RFinit");
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
   if (!sx12xxmbus.initDevice(PinNSS, PinDIO0)) //minRSSI
   {
@@ -127,7 +119,10 @@ Serial.println("RFinit");
   next_wmz_run = millis();
 
   button_init();
-}
+
+  f007th->startRx();
+
+} //setup
 
 void checkcmd()
 {
@@ -165,18 +160,22 @@ void checkcmd()
 void loop()
 {
   //Serial.println(grpwmzL14.vendor);
-  byte idx = check_RF_state(RxPin);
+  //byte idx = check_RF_state(RxPin);
+  f007th->rxHandler2();
 
+  //delay(100);
   //byte idx =0;
+  /*
   if ((idx > 0) && !OLEDoff)
   {
     // ToDo decouple it object driffen approach
     OLED.clearLine(idx);
     snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx - 1], chHum[idx - 1], diff / 1000);
     OLED.drawString(0, idx, displaystr);
-  }
+  } */
 
   if (millis() > next_wmz_run)
+  //if (0)
   {                                                    // we run only once per period
     if (sx12xxmbus.receiveSizedFrame(FixPktSize, 200)) //minRSSI to reduce noice load
     {
@@ -203,6 +202,7 @@ void loop()
     {                            //timeout or we got all
       sx12xxmbus.setModeSleep(); //sx12xx will sleep until next period
       next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run NODEID2
+      f007th->stopRx();          // we want avoid buffer overrrun
 
       wmzL14g.fillsendstr(NODEID2, sendstr, 100);
       Serial.println(sendstr);
@@ -213,19 +213,22 @@ void loop()
       Serial.println(sendstr);
       send2google(sendstr);
       wwzL14g.clearvals();
+
+      f007th->startRx(); // we want avoid buffer overrrun
     }
   } //next wmzrun
 
   checkcmd();
 
-  if ((millis() > nextsend) && (rxstate == 0))
+  if ((millis() > nextsend)) //&& (rxstate == 0))
   //rxstate 0 is in the beginning, waitung for the first edge, ISR disabled
   {
-    snprintf(sendstr, 99, "nodeid=%s&values=%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d;%s;%d", NODEID,
-             temp2str(0), chHum[0], temp2str(1), chHum[1], temp2str(2), chHum[2],
-             temp2str(3), chHum[3], temp2str(4), chHum[4], temp2str(5), chHum[5],
-             temp2str(6), chHum[6]);
+    if ((f007th->stopRx()) != ESP_OK)
+      Serial.println("rmt stop failed"); // we want to avoid buffer overrun of the RMT
+
+    f007th->fillsendstr(NODEID, sendstr, 99);
     Serial.println(sendstr);
+    
     if (send2google(sendstr))
     //if (1)
     {
@@ -237,15 +240,20 @@ void loop()
     }
 
     //Serial.println(ESP.getMinFreeHeap());
+    Serial.println("rmt start ");
+    if ((f007th->startRx()) != ESP_OK) //we want to avoid buffer overrun of the RMT
+    Serial.println("rmt start failed");
   }
-
+  
+        
   if ((millis() > nextdraw)) //&& (rxstate == 0))
   {                          //update the timer on the OLED
 
-    if (!OLEDoff) {
-    unsigned long now1 = millis() / 1000UL;
-    snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
-    OLED.drawString(0, 0, displaystr);
+    if (!OLEDoff)
+    {
+      unsigned long now1 = millis() / 1000UL;
+      snprintf(displaystr, 17, "%2luT%2lu:%02lu:%02lu", elapsedDays(now1), numberOfHours(now1), numberOfMinutes(now1), numberOfSeconds(now1));
+      OLED.drawString(0, 0, displaystr);
     }
     nextdraw += 3000;
     OLED.setPowerSave(OLEDoff); //ToDo encapsulate, wenn off no write to OLED, and call only when changed

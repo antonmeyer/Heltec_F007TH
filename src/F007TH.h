@@ -1,7 +1,6 @@
 #include <Arduino.h>
 //#include <U8x8lib.h>
 //#include <heltec.h>
-#include <Wire.h>
 #include "crc.h"
 
 // Variables for Manchester Receiver Logic:
