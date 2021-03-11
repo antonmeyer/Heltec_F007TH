@@ -74,6 +74,10 @@ public:
         get_calDates(); //get both mbcalDates and mtype
         return 1;       //OK
     };
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+//we do a lot of neasty casts here, so get rid of the warnings
     inline uint32_t get_serial()
     {
         return le32toh(*(uint32_t *)&mbmsg[4]);
@@ -144,6 +148,7 @@ public:
         };
         //ToDo the year is a tricky one. we need to derive it from the prev
     }
+#pragma GCC diagnostic pop //end of ignore "-Wstrict-aliasing"
 
     void printmsg()
     {
@@ -275,7 +280,7 @@ public:
                 return 1;
             }
         }
-        return 0;
+        return 0; //if no return above it is no a match
     } // func matchgrp
 
     inline void fillsendstr(const char * nid, char *s, uint8_t slen)

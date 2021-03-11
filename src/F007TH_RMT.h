@@ -1,5 +1,5 @@
 #include "Arduino.h"
-
+#include "freertos/FreeRTOS.h"
 #include "esp32-hal-rmt.h"
 #include "soc/rmt_struct.h"
 
@@ -23,6 +23,7 @@ typedef struct
 {
     uint8_t hum;
     float temp;
+    uint32_t last;
 } stationvals_t;
 
 class F007TH_RMT
@@ -34,6 +35,10 @@ class F007TH_RMT
     uint64_t bits;  //hold the decoded bits
     int8_t oBit;
     char sync;
+    uint8_t *_pstnidx; // returns stnidx from the successful decoded message, is a bitfiled
+   // unsigned int oldread = 0;
+   TickType_t xTicksOld =0;
+
 
 public:
     stationvals_t allvals[8]; //hold all values from 8 Stations
@@ -52,18 +57,17 @@ public:
 
     void initRx()
     {
-        rmt_rx.channel = RMT_CHANNEL_0;
+        rmt_rx.channel = RMT_CHANNEL_4;
         rmt_rx.gpio_num = (gpio_num_t)RFpin;
         rmt_rx.clk_div = 80;
-        rmt_rx.mem_block_num = 8;
+        rmt_rx.mem_block_num = 4; // at min 1 could be enough, but to get all, 3 is better
         rmt_rx.rmt_mode = RMT_MODE_RX;
 
         rmt_rx.rx_config.filter_en = true;
-        rmt_rx.rx_config.filter_ticks_thresh = 255;
-        rmt_rx.rx_config.idle_threshold = 2000;
+        rmt_rx.rx_config.filter_ticks_thresh = 255; //ADB ticks at 80 MHz?
+        rmt_rx.rx_config.idle_threshold = 1500;    // at 80 MHz or 1 MHz??
 
         rmt_config(&rmt_rx);
-        rmt_set_rx_filter(rmt_rx.channel, 1, 255); // just to double check
         rmt_driver_install(rmt_rx.channel, 2048, 0);
 
         rmt_get_ringbuf_handle(rmt_rx.channel, &rb);
@@ -73,30 +77,56 @@ public:
     }
 
     char startRx()
-    {
+    {   Serial.println("f007th rmt start");
+        //rmt_set_rx_intr_en(rmt_rx.channel, pdTRUE);
+        rmt_set_err_intr_en(rmt_rx.channel, pdTRUE);
+        rmt_set_rx_intr_en(rmt_rx.channel, pdTRUE);
         return rmt_rx_start(rmt_rx.channel, 1);
     };
     char stopRx()
-    {
-        return rmt_rx_stop(rmt_rx.channel);
+    { //for some reason, stop does not stop the Buffer full error message
+        //rmt_rx_stop(rmt_rx.channel); //first stop
+        Serial.println("f007th rmt stop");
+        //rmt_memory_rw_rst(rmt_rx.channel);
+        rmt_set_rx_intr_en(rmt_rx.channel, pdFALSE);
+        rmt_set_err_intr_en(rmt_rx.channel, pdFALSE); //supress the RMT BUFFER FULL messages flood
+        return rmt_rx_stop(rmt_rx.channel); //2nd stop
     }
 
-    char rxHandler2()
+    char rxHandler2(uint8_t *stnidx)
     {
         size_t rx_size;
         char result = 0;
-        unsigned int uxwait, uxfree, uxread, uxwrite;
-        vRingbufferGetInfo(rb, &uxfree, &uxread, &uxwrite, &uxwait); 
+        _pstnidx = stnidx;
+       /* unsigned int uxwait, uxfree, uxread, uxwrite;
+        vRingbufferGetInfo(rb, &uxfree, &uxread, &uxwrite, &uxwait);
         //if (uxwait < 100) return 1;
         //Serial.println(rmt_get_mem_len(rmt_rx.channel ));
         //xRingbufferPrintInfo(rb);
-        rmt_item32_t *item = (rmt_item32_t *)xRingbufferReceive(rb, &rx_size, 200);
+        Serial.printf("A free:%d, read:%d, write:%d, wait:%d\n", uxfree, uxread, uxwrite, uxwait);
+        uint16_t diff = (uxread > oldread)? (uxread - oldread) : (oldread - uxread);
+        Serial.printf("diff: %d\n", diff);
+        if (diff <20) return 0;
+        oldread = uxread;
+        */
+        /*ToDo the timeout (last parameter) should be shorter
+        the main Idea of using RMT was to offload the CPU and not to block in
+        busy loops, but we got to many short chunks if we choose that shorter
+        we might use this parameter dynamic and substruct the time between 2 calls
+        */
+       int diff = 10 - (xTaskGetTickCount() -xTicksOld) ; //wrapp around problem
+       //Serial.printf("diff: %d",diff);
+       if (diff <1) diff =1;
+       xTicksOld = xTaskGetTickCount();
+    //TickType_t xTicksRemaining = xTicksToWait;
+        rmt_item32_t *item = (rmt_item32_t *)xRingbufferReceive(rb, &rx_size, diff);
         //xRingbufferPrintInfo(rb);
         if (item != NULL)
         {
-            if (rx_size > 100)
-            { //Serial.println(xRingbufferGetCurFreeSize(rb));
-                Serial.printf("free:%d, read:%d, write:%d, wait:%d\n", uxfree, uxread, uxwrite, uxwait);
+            if (rx_size > 100) //ToDo ugly hack, we do not have success with multiple smaler chunks
+            {                //Serial.println(xRingbufferGetCurFreeSize(rb));
+               // Serial.printf("B free:%d, read:%d, write:%d, wait:%d\n", uxfree, uxread, uxwrite, uxwait);
+            //Serial.printf("diff: %d\n",diff);
                 rxhandler(item, rx_size);
                 result = 1;
             }
@@ -152,7 +182,11 @@ public:
             {
                 allvals[stnId].hum = chHum;
                 allvals[stnId].temp = chTemp;
-                Serial.printf("%d:%.2f:%d:%.2f\n", stnId + 1, chTemp, chHum, absHum(chTemp, chHum));
+                
+                Serial.printf("%d:%.2f:%d:%lu\n", stnId + 1, chTemp, chHum, (millis() - allvals[stnId].last)/1000);
+                allvals[stnId].last = millis();
+                *_pstnidx |= ((uint8_t)0x1 << stnId);
+                //Serial.println(*_pstnidx,BIN);
             }
         }
     }

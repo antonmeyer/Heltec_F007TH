@@ -41,7 +41,7 @@ boolean send2google(String datastr)
   httpsClient.setReuse(false);
   boolean result;
   if (WiFi.status() != WL_CONNECTED){
-    Serial.println("Wifi needs erconnect");
+    Serial.println("Wifi needs reconnect");
     WiFiinit();
   }
    
@@ -59,7 +59,7 @@ boolean send2google(String datastr)
       if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY)
       {
         //String payload = httpsClient.getString();
-        // Serial.println(payload);
+        //Serial.println(payload);
         result = true;
       };
       Serial.println(httpCode);

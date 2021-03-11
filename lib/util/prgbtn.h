@@ -6,7 +6,7 @@
 //#include "freertos/semphr.h"
 #include "Arduino.h"
 
-uint8_t OLEDoff;
+uint8_t OLEDoff =0;
 
 void IRAM_ATTR btn_ISR()
 {
@@ -17,7 +17,6 @@ void IRAM_ATTR btn_ISR()
    // OLED.setPowerSave(OLEDon); //ToDo this is uggly as it depends from the include order
 
     interrupts();
-
 
 } // end of isr
 

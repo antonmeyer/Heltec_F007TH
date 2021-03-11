@@ -103,7 +103,7 @@ void setup()
   // ToDo disable ISR during reconnect
   WiFiinit();
   //RFinit(RxPin);
-  
+
   nextsend = millis() + period; //update asap
   Serial.println("RFinit");
   //if (!rfm69.initDevice(PinNSS, PinDIO0, CW, 868.95, GFSK, 100000, 40000, 5, PAind))
@@ -161,19 +161,31 @@ void loop()
 {
   //Serial.println(grpwmzL14.vendor);
   //byte idx = check_RF_state(RxPin);
-  f007th->rxHandler2();
+  uint8_t stnidx = 0;
+  f007th->rxHandler2(&stnidx);
 
   //delay(100);
   //byte idx =0;
-  /*
-  if ((idx > 0) && !OLEDoff)
+   // send it to display if any update
+  if ((stnidx > 0) && !OLEDoff)
   {
-    // ToDo decouple it object driffen approach
-    OLED.clearLine(idx);
-    snprintf(displaystr, 17, "%d:%sC %2d%% %4d", idx, tempstr[idx - 1], chHum[idx - 1], diff / 1000);
-    OLED.drawString(0, idx, displaystr);
-  } */
+    // ToDo decouple it object driven approach
+    uint8_t bitmask = 0x1;
+    for (uint8_t idx = 0; 0< stnidx; idx++)
+    { 
+      if ((stnidx & bitmask))
+      { 
+        stnidx &= (~bitmask); //clear station bit in field
+        OLED.clearLine(idx + 1);
+        snprintf(displaystr, 17, "%d:%.1fC %2d%% %.2f",
+                 idx+1, f007th->allvals[idx].temp, f007th->allvals[idx].hum, absHum(f007th->allvals[idx].temp, f007th->allvals[idx].hum));
+        OLED.drawString(0, idx+1, displaystr);
+      };
+      bitmask <<= 1; //shift bitmask one step further
+    };
+  }; //sendto display done
 
+  // are we in an active WMZ periode?
   if (millis() > next_wmz_run)
   //if (0)
   {                                                    // we run only once per period
@@ -199,16 +211,20 @@ void loop()
     }   // packet received
 
     if ((wmzL14g.complete() && wwzL14g.complete()) || (millis() > (next_wmz_run + wmz_wait)))
-    {                            //timeout or we got all
+    { //timeout or we got all
+      f007th->stopRx(); // we want avoid buffer overrrun
+      //Serial.println("f007th rmt stoped");
+      //delay(1000);
+
       sx12xxmbus.setModeSleep(); //sx12xx will sleep until next period
-      next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run NODEID2
-      f007th->stopRx();          // we want avoid buffer overrrun
+      next_wmz_run += wmz_cycle; // add 1 period before next wmz capture run
 
       wmzL14g.fillsendstr(NODEID2, sendstr, 100);
       Serial.println(sendstr);
       send2google(sendstr); // resend ToDo
       //init for the next run
       wmzL14g.clearvals();
+
       wwzL14g.fillsendstr("WWL14", sendstr, 100);
       Serial.println(sendstr);
       send2google(sendstr);
@@ -220,15 +236,17 @@ void loop()
 
   checkcmd();
 
+  // next send of f007th values to the spreadsheet
   if ((millis() > nextsend)) //&& (rxstate == 0))
   //rxstate 0 is in the beginning, waitung for the first edge, ISR disabled
-  {
-    if ((f007th->stopRx()) != ESP_OK)
-      Serial.println("rmt stop failed"); // we want to avoid buffer overrun of the RMT
+  {  
+    f007th->stopRx();
+      // we want to avoid buffer overrun of the RMT
+    
 
     f007th->fillsendstr(NODEID, sendstr, 99);
     Serial.println(sendstr);
-    
+
     if (send2google(sendstr))
     //if (1)
     {
@@ -240,12 +258,10 @@ void loop()
     }
 
     //Serial.println(ESP.getMinFreeHeap());
-    Serial.println("rmt start ");
-    if ((f007th->startRx()) != ESP_OK) //we want to avoid buffer overrun of the RMT
-    Serial.println("rmt start failed");
+    
+    f007th->startRx(); //we want to avoid buffer overrun of the RMT
   }
-  
-        
+
   if ((millis() > nextdraw)) //&& (rxstate == 0))
   {                          //update the timer on the OLED
 

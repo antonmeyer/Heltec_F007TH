@@ -9,7 +9,7 @@ so the trick could be calculate both absHum and open the window if basement is h
 
 #include <math.h>
 
-float absHum (float T, char rh) {
+inline float absHum (float T, char rh) {
 
 return ((6.112 * exp(((17.67 *T)/(T+243.5))) * rh * 2.1674) / (273.15 + T));
 }
