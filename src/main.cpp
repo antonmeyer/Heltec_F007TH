@@ -221,13 +221,15 @@ void loop()
 
       wmzL14g.fillsendstr(NODEID2, sendstr, 100);
       Serial.println(sendstr);
-      send2google(sendstr); // resend ToDo
+      if (!send2google(sendstr))
+            send2google(sendstr); // resend ToDo
       //init for the next run
       wmzL14g.clearvals();
 
       wwzL14g.fillsendstr("WWL14", sendstr, 100);
       Serial.println(sendstr);
-      send2google(sendstr);
+      if (!send2google(sendstr))
+            send2google(sendstr); // resend ToDo
       wwzL14g.clearvals();
 
       f007th->startRx(); // we want avoid buffer overrrun
